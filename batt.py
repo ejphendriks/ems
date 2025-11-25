@@ -25,7 +25,7 @@ from datetime import datetime
 from pymodbus.client import ModbusSerialClient
 
 # -----------------------------------------------------------------
-module_name = "BATT"
+module_name = "MRST"
 # -----------------------------------------------------------------
 
 # -----------------------------------------------------------------
@@ -128,7 +128,7 @@ MARSTEK_MODBUS = [
 [33,"MRST_BACKUP_VOLT",32300,"BU",4,0,"R","u",raw_value,0.1,con_value,"V",""],
 [34,"MRST_BACKUP_CURR",32301,"BU",0,1,"R","u",raw_value,0.01,con_value,"A",""],
 [35,"MRST_BACKUP_PWR_DIR",32302,"BU",0,2,"R","s",raw_value,1,con_value,"W","pos is discharge"],
-[36,"MRST_BACKUP_PWR_VAL",32303,"BU",0,2,"R","s",raw_value,1,con_value,"W","pos is discharge"],
+[36,"MRST_BACKUP_PWR_VAL",32303,"BU",0,3,"R","s",raw_value,1,con_value,"W","pos is discharge"],
 [37,"MRST_TOT_CHARGED_H",33000,"ST",12,0,"R","u",raw_value,0.01,con_value,"kWh",""],
 [38,"MRST_TOT_CHARGED_L",33001,"ST",0,1,"R","u",raw_value,0.01,con_value,"kWh",""],
 [39,"MRST_TOT_DISCHARGED_H",33002,"ST",0,2,"R","u",raw_value,0.01,con_value,"kWh",""],
@@ -141,11 +141,11 @@ MARSTEK_MODBUS = [
 [46,"MRST_MNT_CHARGED_L",33009,"ST",0,9,"R","u",raw_value,0.01,con_value,"kWh",""],
 [47,"MRST_MNT_DISCHARGED_H",33010,"ST",0,10,"R","u",raw_value,0.01,con_value,"kWh",""],
 [48,"MRST_MNT_DISCHARGED_L",33011,"ST",0,11,"R","u",raw_value,0.01,con_value,"kWh",""],
-[49,"MRST_INT_TEMP",35000,"TP",3,0,"R","u",raw_value,0.1,con_value,"C",""],
-[50,"MRST_MOS1_TEMP",35001,"TP",0,1,"R","u",raw_value,0.1,con_value,"C",""],
-[51,"MRST_MOS2_TEMP",35002,"TP",0,2,"R","u",raw_value,0.1,con_value,"C",""],
-[52,"MRST_MAX_CELL_TEMP",35010,"CT",2,0,"R","u",raw_value,0.1,con_value,"C",""],
-[53,"MRST_MIN_CELL_TEMP",35011,"CT",0,1,"R","u",raw_value,0.1,con_value,"C",""],
+[49,"MRST_INT_TEMP",35000,"TP",3,0,"R","u",raw_value,0.1,con_value,"°C",""],
+[50,"MRST_MOS1_TEMP",35001,"TP",0,1,"R","u",raw_value,0.1,con_value,"°C",""],
+[51,"MRST_MOS2_TEMP",35002,"TP",0,2,"R","u",raw_value,0.1,con_value,"°C",""],
+[52,"MRST_MAX_CELL_TEMP",35010,"CT",2,0,"R","u",raw_value,0.1,con_value,"°C",""],
+[53,"MRST_MIN_CELL_TEMP",35011,"CT",0,1,"R","u",raw_value,0.1,con_value,"°C",""],
 [54,"MRST_INV_STATE",35100,"IS",1,0,"R","u",raw_value,1,con_value," ",""],
 [55,"MRST_LIMIT_VOLT",35110,"LT",3,0,"R","u",raw_value,100,con_value,"mv",""],
 [56,"MRST_LIMIT_CHARGE_CURR",35111,"LT",0,1,"R","u",raw_value,100,con_value,"ma",""],
@@ -183,14 +183,53 @@ IDXM_CONV = 10  # - Value (converted and adjusted for gain)
 IDXM_UNIT = 11  # - Unit
 IDXM_DESC = 12  # - Description
 
-
 # -----------------------------------------------------------------------------------------
 # --- BATT thread -----------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------
     
+def copy_marstek_to_batt(): 
+    
+    # --- Clear Device Name in BATT REG LIST : AC01..............
+    globl.BATT_REGISTER_LIST[globl.BATT_DEVICE_NAME][globl.IDXB_CONV] = "" # clear string
+    # --- Copy the Device Name block 10x --> 20 characters (bytes)
+    for idxm in range(MRST_DEVICE_NAME, MARSTEK_MODBUS[MRST_DEVICE_NAME][IDXM_BLCK] + MRST_DEVICE_NAME): # + 1
+        globl.BATT_REGISTER_LIST[globl.BATT_DEVICE_NAME][globl.IDXB_CONV] += MARSTEK_MODBUS[idxm][IDXM_CONV] # --- append str
+
+    #--- Copy MRST_FW_VERSION
+    globl.BATT_REGISTER_LIST[globl.BATT_FW_VERSION][globl.IDXB_CONV] = MARSTEK_MODBUS[MRST_FW_VERSION][IDXM_CONV]
+
+    # --- Clear Serial Number in BATT REG LIST
+    globl.BATT_REGISTER_LIST[globl.BATT_SERIAL_NUM][globl.IDXB_CONV] = "" # clear string
+    # --- Copy the Serial Number block 10x --> 20 characters (bytes)
+    for idxm in range(MRST_SERIAL_NUM, MARSTEK_MODBUS[MRST_SERIAL_NUM][IDXM_BLCK] + MRST_SERIAL_NUM ): # + 1
+        globl.BATT_REGISTER_LIST[globl.BATT_SERIAL_NUM][globl.IDXB_CONV] += MARSTEK_MODBUS[idxm][IDXM_CONV] # --- append str
+
+    # Now copy all converterd value registers 1 on 1 until MRST_TOT_CHARGED (2 regs)
+    for idxm in range(MRST_DC_VOLT, MRST_BACKUP_PWR_VAL + 1):
+        #--- Copy regs incl offset BATT REG (3) vs MARST_MODBUS (22) (22-3=19)
+        offset = MRST_DC_VOLT - globl.BATT_DC_VOLT 
+        globl.BATT_REGISTER_LIST[idxm-offset][globl.IDXB_CONV] = MARSTEK_MODBUS[idxm][IDXM_CONV]
+   
+    #--- Copy BATT_TOT_CHARGED -- Because these registers consist of 2 words...
+    #globl.BATT_REGISTER_LIST[globl.BATT_TOT_CHARGED][globl.IDXB_CONV] = (MARSTEK_MODBUS[MRST_TOT_CHARGED_H][IDXM_CONV] + MARSTEK_MODBUS[MRST_TOT_CHARGED_L][IDXM_CONV]) * MARSTEK_MODBUS[MRST_TOT_CHARGED_L][IDXM_GAIN]
+    #globl.BATT_REGISTER_LIST[globl.BATT_TOT_DISCHARGED][globl.IDXB_CONV] = (MARSTEK_MODBUS[MRST_TOT_DISCHARGED_H][IDXM_CONV] + MARSTEK_MODBUS[MRST_TOT_DISCHARGED_L][IDXM_CONV]) * MARSTEK_MODBUS[MRST_TOT_DISCHARGED_L][IDXM_GAIN]
+    globl.BATT_REGISTER_LIST[globl.BATT_TOT_CHARGED][globl.IDXB_CONV] = "n.a."
+    globl.BATT_REGISTER_LIST[globl.BATT_TOT_DISCHARGED][globl.IDXB_CONV] = "n.a."
+    globl.BATT_REGISTER_LIST[globl.BATT_DAY_CHARGED][globl.IDXB_CONV] = "n.a."
+    globl.BATT_REGISTER_LIST[globl.BATT_DAY_DISCHARGED][globl.IDXB_CONV] = "n.a."
+    globl.BATT_REGISTER_LIST[globl.BATT_MNT_CHARGED][globl.IDXB_CONV] = "n.a."
+    globl.BATT_REGISTER_LIST[globl.BATT_MNT_DISCHARGED][globl.IDXB_CONV] = "n.a."
+    
+    # Now copy all remaining registers until the end of the list
+    for idxm in range(MRST_INT_TEMP, MRST_MAX_DISCHARGE_PWR + 1):
+        #--- Copy regs incl offset BATT REG (24) vs MARST_MODBUS (49) (49-24=25)
+        offset = MRST_INT_TEMP - globl.BATT_INT_TEMP
+        globl.BATT_REGISTER_LIST[idxm-offset][globl.IDXB_CONV] = MARSTEK_MODBUS[idxm][IDXM_CONV]
+
 # -----------------------------------------------------------------------------------------
 # --- Convert all modbus register values in the MARSTEK_MODBUS list object CON_VALUE ------
 # -----------------------------------------------------------------------------------------
+
 def convert_modbus_registers():
 
     global MARSTEK_MODBUS
@@ -237,7 +276,7 @@ def print_modbus_registers(): # --- Print all registers in MARSTEK_MODBUS
     
     global MARSTEK_MODBUS
     
-    if globl.show_batt:
+    if globl.show_mrst:
         
         print("[MRST] GR | NAME                     |  REG  | ADDR HEX | VAL HEX | VAL DEC | VAL CONV | UNIT | DESC .... ")
         print("[MRST] ---+--------------------------+-------+----------+---------+---------+----------+------+-----------")
@@ -466,6 +505,10 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
 
                 # --- Convert all MODBUS registers and adjust gain
                 convert_modbus_registers()
+
+                # --- Copy MARSTEK MODBUS LIST to BATT_REGISTER_LIST with Thread.Lock
+                copy_marstek_to_batt()
+                
                 # --- Print all MODBUS registers
                 print_modbus_registers()
 

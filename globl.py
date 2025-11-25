@@ -25,7 +25,132 @@ show_dsmr = False
 show_batt = False
 show_bsld = False
 
-show_debug = True
+show_debug = False
+
+# -----------------------------------------------------------------------------
+# ---- BATT fields taking values from MRST ------------------------------------
+# -----------------------------------------------------------------------------
+
+# --- BATT_INDEX_LIST is not starting with zero because of header in BATT_REG_LST
+BATT_DEVICE_NAME = 1 #  31000 char n.a. 
+BATT_FW_VERSION = 2 #  31100 u16 0.01 
+BATT_SERIAL_NUM = 3 #  31200 char n.a. 
+BATT_DC_VOLT = 4 #  32100 u16 0.01V 
+BATT_DC_CURR = 5 #  32101 s16 0.01A 
+BATT_DC_PWR_DIR = 6 #  32103 s32  positive means power into batt (charging)
+BATT_DC_PWR_VAL = 7 #  32103 s32 1W positive means power into batt (charging)
+BATT_DC_SOC = 8 #  32104 u16 0.1% 
+BATT_DC_TOT_ENRG = 9 #  32105 u16 1wh 
+BATT_AC_VOLT = 10 #  32200 u16 0.1V 
+BATT_AC_CURR = 11 #  32201 s16 0.01A 
+BATT_AC_PWR_DIR = 12 #  32202 s32  positive means power into the home (discharging)
+BATT_AC_PWR_VAL = 13 #  32202 s32 1W positive means power into the home (discharging)
+BATT_AC_FREQ = 14 #  32204 u16 0.01Hz 
+BATT_BACKUP_VOLT = 15 #  32300 u16 0.1V 
+BATT_BACKUP_CURR = 16 #  32301 u16 0.01A 
+BATT_BACKUP_PWR_DIR = 17 #  32302 s32 1W 
+BATT_BACKUP_PWR_VAL = 18 #  32302 s32 1W 
+BATT_TOT_CHARGED = 19 #  33000 u32 0.01kWh 
+BATT_TOT_DISCHARGED = 20 #  33002 u32 0.01kWh 
+BATT_DAY_CHARGED = 21 #  33004 u32 0.01kWh 
+BATT_DAY_DISCHARGED = 22 #  33006 u32 0.01kWh 
+BATT_MNT_CHARGED = 23 #  33008 u32 0.01kWh 
+BATT_MNT_DISCHARGED = 24 #  33010 u32 0.01kWh 
+BATT_INT_TEMP = 25 #  35000 u16 0.1C 
+BATT_MOS1_TEMP = 26 #  35001 u16 0.1C 
+BATT_MOS2_TEMP = 27 #  35002 u16 0.1C 
+BATT_MAX_CELL_TEMP = 28 #  35010 u16 0.1C 
+BATT_MIN_CELL_TEMP = 29 #  35011 u16 0.1C 
+BATT_INV_STATE = 30 #  35100 u16 n.a. 0:sleep, 1:standby, 2:charging, 3:discharging, 4:backup, 5:upgrading
+BATT_LIMIT_VOLT = 31 #  35110 u16 100mv 
+BATT_LIMIT_CHARGE_CURR = 32 #  35111 u16 100ma 
+BATT_LIMIT_DISCHARG_CURR = 33 #  35112 u16 100ma 
+BATT_ALARM = 34 #  36000 bits n.a. Alarm register
+BATT_FAULT_LSB = 35 #  36100 bits n.a. Fault register
+BATT_FAULT_MSB = 36 #  36100 bits n.a. Fault register
+BATT_RESTART = 37 #  41000 u16 n.a. restart write 0x55AA 
+BATT_UNIT_ID = 38 #  41100 u16 n.a. Set the Unit ID / Device ID
+BATT_BACKUP = 39 #  41200 u16 n.a. 0: enable backup, 1: disable backup
+BATT_RTU_MODE = 40 #  42000 u16 n.a. enable RS485 mode 0x55AA, disable: 0x55BB
+BATT_INV_STATE = 41 #  42010 u16 n.a. 0:stop, 1:charge, 2:discharge
+BATT_CHARGE_TO_SOC = 42 #  42011 u16 0,01 set charge to SoC value in 1%
+BATT_PWR_CHARGE = 43 #  42020 u16 1W set charging power [0-2500W]
+BATT_PWR_DISCHARGE = 44 #  42021 u16 1W set discharging power [0-2500W]
+BATT_USER_MODE = 45 #  43000 u16 n.a. 0:manual, 1:anti-feed, 2:trade mode
+BATT_CHARGE_CUTOFF = 46 #  44000 u16 0.1% 
+BATT_DISCHARGE_CUTOFF = 47 #  44001 u16 0.1% 
+BATT_MAX_CHARGE_PWR = 48 #  44002 u16 1W 
+BATT_MAX_DISCHARGE_PWR = 49 #  44003 u16 1W 
+
+cvalue = 0
+
+BATT_REGISTER_LIST = [
+["INDX","NAME","ABBR","CONV","UNIT","DESC"],
+[1,"BATT_DEVICE_NAME","DN",cvalue," ",""],
+[2,"BATT_FW_VERSION","FW",cvalue," ",""],
+[3,"BATT_SERIAL_NUM","SN",cvalue," ",""],
+[4,"BATT_DC_VOLT","DC",cvalue,"V",""],
+[5,"BATT_DC_CURR","DC",cvalue,"A",""],
+[6,"BATT_DC_PWR_DIR","DC",cvalue,"W","pos is charge"],
+[7,"BATT_DC_PWR_VAL","DC",cvalue,"W","pos is charge"],
+[8,"BATT_DC_SOC","DC",cvalue,"%",""],
+[9,"BATT_DC_TOT_ENRG","DC",cvalue,"kWh",""],
+[10,"BATT_AC_VOLT","AC",cvalue,"V",""],
+[11,"BATT_AC_CURR","AC",cvalue,"A",""],
+[12,"BATT_AC_PWR_DIR","AC",cvalue,"W","pos is discharge"],
+[13,"BATT_AC_PWR_VAL","AC",cvalue,"W","pos is discharge"],
+[14,"BATT_AC_FREQ","AC",cvalue,"Hz",""],
+[15,"BATT_BACKUP_VOLT","BU",cvalue,"V",""],
+[16,"BATT_BACKUP_CURR","BU",cvalue,"A",""],
+[17,"BATT_BACKUP_PWR_DIR","BU",cvalue,"W","pos is discharge"],
+[18,"BATT_BACKUP_PWR_VAL","BU",cvalue,"W","pos is discharge"],
+[19,"BATT_TOT_CHARGED","ST",cvalue,"kWh",""],
+[20,"BATT_TOT_DISCHARGED","ST",cvalue,"kWh",""],
+[21,"BATT_DAY_CHARGED","ST",cvalue,"kWh",""],
+[22,"BATT_DAY_DISCHARGED","ST",cvalue,"kWh",""],
+[23,"BATT_MNT_CHARGED","ST",cvalue,"kWh",""],
+[24,"BATT_MNT_DISCHARGED","ST",cvalue,"kWh",""],
+[25,"BATT_INT_TEMP","TP",cvalue,"°C",""],
+[26,"BATT_MOS1_TEMP","TP",cvalue,"°C",""],
+[27,"BATT_MOS2_TEMP","TP",cvalue,"°C",""],
+[28,"BATT_MAX_CELL_TEMP","CT",cvalue,"°C",""],
+[29,"BATT_MIN_CELL_TEMP","CT",cvalue,"°C",""],
+[30,"BATT_INV_STATE","IS",cvalue," ",""],
+[31,"BATT_LIMIT_VOLT","LT",cvalue,"mv",""],
+[32,"BATT_LIMIT_CHARGE_CURR","LT",cvalue,"ma",""],
+[33,"BATT_LIMIT_DISCHARG_CURR","LT",cvalue,"ma",""],
+[34,"BATT_ALARM","AL",cvalue," ","Alarm register"],
+[35,"BATT_FAULT_LSB","FT",cvalue," ","Fault double register"],
+[36,"BATT_FAULT_MSB","FT",cvalue," ","Fault double register"],
+[37,"BATT_RESTART","RS",cvalue," ","0x55AA-->restart"],
+[38,"BATT_UNIT_ID","UI",cvalue," ","unit id [1..255]"],
+[39,"BATT_BACKUP","BK",cvalue," ","0:enable, 1:disbale"],
+[40,"BATT_RTU_MODE","RM",cvalue," ","ON:0x55AA, OFF: 0x55BB"],
+[41,"BATT_INV_STATE","IV",cvalue," ","0:stop,1:charge,2:discharge"],
+[42,"BATT_CHARGE_TO_SOC","IV",cvalue," ","charge to target SOC"],
+[43,"BATT_PWR_CHARGE","PW",cvalue,"W","range:[0..2500W]"],
+[44,"BATT_PWR_DISCHARGE","PW",cvalue,"W","range:[0..2500W]"],
+[45,"BATT_USER_MODE","UM",cvalue," ","0:manual,1:anti-feed,2:trade-mode"],
+[46,"BATT_CHARGE_CUTOFF","CO",cvalue,"%","range:[80%..100%]"],
+[47,"BATT_DISCHARGE_CUTOFF","CO",cvalue,"%","range:[12%..30%]"],
+[48,"BATT_MAX_CHARGE_PWR","CO",cvalue,"W","range:[0..2500W]"],
+[49,"BATT_MAX_DISCHARGE_PWR","CO",cvalue,"W","range:[0..2500W]"]
+]
+
+# --- BATT_FIELD_INDEX index for BATT fields ---- 
+IDXB_INDX = 0   # - Index number
+IDXB_NAME = 1   # - Field name 
+IDXB_ABBR = 2   # - Abbreviation
+IDXB_CONV = 3   # - Value
+IDXB_UNIT = 4   # - Unit
+IDXB_DESC = 5   # - Description
+
+
+# -----------------------------------------------------------------------------
+# ---- HOME fields taking values from DSMR ------------------------------------
+# -----------------------------------------------------------------------------
+
+
 
 # -----------------------------------------------------------------------------
 # ---- Global thread control --------------------------------------------------
@@ -65,112 +190,10 @@ def log_debug(module, sentence):
 # --- BATT global constants and variables ---------------------------------------------------------
 # -----------------------------------------------------------------------------
 
-batt_data = []          # Global list with converted BATT MODBUS values
+# batt_data = []          # Global list with converted BATT MODBUS values
 
 # -----------------------------------------------------------------------------
 
-# -----------------------------------------------------------------------------
-# --- DSMR DATA FIELD ---------------------------------------------------------
-# -----------------------------------------------------------------------------
-
-DSMR_VERSION        =  0 # --- 0.2.8    --- DSMR version number
-DSMR_TIME_STAMP     =  1 # --- 1.0.0    --- Time stamp (251022130635S)
-DSMR_SERIAL_NUM     =  2 # --- 96.1.1   --- Serial Number 
-DSMR_ENRG_T1_CONS   =  3 # --- 1.8.1    --- Electricity consumed by client (Tariff 1) in 0,001 kWh
-DSMR_ENRG_T2_CONS   =  4 # --- 1.8.2    --- Electricity consumed by client (Tariff 2) in 0,001 kWh
-DSMR_ENRG_T1_PROD   =  5 # --- 2.8.1    --- Electricity produced by client (Tariff 1) in 0,001 kWh
-DSMR_ENRG_T2_PROD   =  6 # --- 2.8.2    --- Electricity produced by client (Tariff 2) in 0,001 kWh
-DSMR_ACTIVE_TARIF   =  7 # --- 96.14.0  --- Active tarif
-DSMR_PWR_TOT_CONS   =  8 # --- 1.7.0    --- Actual electricity power delivered (+P) in Watt 
-DSMR_PWR_TOT_PROD   =  9 # --- 2.7.0    --- Actual electricity power received (-P) in Watt
-DSMR_VOLT_L1        = 10 # --- 32.7.0   --- Instantaneous voltage L1 1-0:32.7.0.255
-DSMR_VOLT_L2        = 11 # --- 52.7.0   --- Instantaneous voltage L2 1-0:52.7.0.255
-DSMR_VOLT_L3        = 12 # --- 72.7.0   --- Instantaneous voltage L3 1-0:72.7.0.255
-DSMR_CURR_L1        = 13 # --- 31.7.0   --- Instantaneous current L1 1-0:31.7.0.255
-DSMR_CURR_L2        = 14 # --- 51.7.0   --- Instantaneous current L2 1-0:51.7.0.255
-DSMR_CURR_L3        = 15 # --- 71.7.0   --- Instantaneous current L3 1-0:71.7.0.255
-DSMR_PWR_L1_CONS    = 16 # --- 21.7.0   --- Instantaneous active power L1 (+P) 1-0:21.7.0.255
-DSMR_PWR_L2_CONS    = 17 # --- 41.7.0   --- Instantaneous active power L2 (+P) 1-0:41.7.0.255
-DSMR_PWR_L3_CONS    = 18 # --- 61.7.0   --- Instantaneous active power L3 (+P) 1-0:61.7.0.255
-DSMR_PWR_L1_PROD    = 19 # --- 22.7.0   --- Instantaneous active power L1 (-P) 1-0:22.7.0.255
-DSMR_PWR_L2_PROD    = 20 # --- 42.7.0   --- Instantaneous active power L2 (-P) 1-0:42.7.0.255
-DSMR_PWR_L3_PROD    = 21 # --- 62.7.0   --- Instantaneous active power L3 (-P)
-DSMR_GAS_SERIAL_NUM = 22 # --- 96.1.0   --- Serial Number 
-DSMR_GAS_TIME_STAMP = 23 # --- 24.2.1   --- Gas timestamp
-DSMR_GAS_VOLUME     = 24 # --- 24.2.1   --- Gas in m3
-
-# --- OBIS LIST --------------------------------------------------------------------------
-
-OBIS_LIST = [
-"1.0.0",
-"0.2.8",
-"96.1.1",
-"1.8.1",
-"1.8.2",
-"2.8.1",
-"2.8.2",
-"96.14.0",
-"1.7.0",
-"2.7.0",
-"32.7.0",
-"52.7.0",
-"72.7.0",
-"31.7.0",
-"51.7.0",
-"71.7.0",
-"21.7.0",
-"41.7.0",
-"61.7.0",
-"22.7.0",
-"42.7.0",
-"62.7.0",
-"96.1.0",
-"24.2.1",
-"24.2.1"
-]
-
-# --- DSMR OBIS DATA LIST --------------------------------------------------------------------------
-
-# --- Index for DSMR fields ----
-IDXD_NAME = 0   # - Field name 
-IDXD_OBIS = 1   # - OBIS identifier
-IDXD_TYPE = 2   # - Type of value
-IDXD_SVAL = 3   # - Raw string value
-IDXD_NVAL = 4   # - Nummeric value    
-IDXD_DIVR = 5   # - Divider (/1000)
-IDXD_UNIT = 6   # - Unit (kWh)
-
-# --- supporting variables
-str_value = "mtr-value"
-num_value = 0
-
-DSMR_OBIS_LIST = [
-["DSMR_VERSION", "0.2.8", "u", str_value, num_value, 10, ""],
-["DSMR_TIME_STAMP", "1.0.0", "t", str_value, num_value, 1, ""],
-["DSMR_SERIAL_NUM", "96.1.1", "s", str_value, num_value, 1, ""],
-["DSMR_ENRG_T1_CONS", "1.8.1", "u", str_value, num_value, 1000, "Wh"],
-["DSMR_ENRG_T2_CONS", "1.8.2", "u", str_value, num_value, 1000, "Wh"],
-["DSMR_ENRG_T1_PROD", "2.8.1", "u", str_value, num_value, 1000, "Wh"],
-["DSMR_ENRG_T2_PROD", "2.8.2", "u", str_value, num_value, 1000, "Wh"],
-["DSMR_ACTIVE_TARIF", "96.14.0", "u", str_value, num_value, 1, ""],
-["DSMR_PWR_TOT_CONS", "1.7.0", "u", str_value, num_value, 1, "W CONS"],
-["DSMR_PWR_TOT_PROD", "2.7.0", "u", str_value, num_value, 1, "W PROD"],
-["DSMR_VOLT_L1", "32.7.0", "u", str_value, num_value, 10, "V L1"],
-["DSMR_VOLT_L2", "52.7.0", "u", str_value, num_value, 10, "V L2"],
-["DSMR_VOLT_L3", "72.7.0", "u", str_value, num_value, 10, "V L3"],
-["DSMR_CURR_L1", "31.7.0", "u", str_value, num_value, 1, "A L1"],
-["DSMR_CURR_L2", "51.7.0", "u", str_value, num_value, 1, "A L2"],
-["DSMR_CURR_L3", "71.7.0", "u", str_value, num_value, 1, "A L3"],
-["DSMR_PWR_L1_CONS", "21.7.0", "u", str_value, num_value, 1, "W L1 CONS"],
-["DSMR_PWR_L2_CONS", "41.7.0", "u", str_value, num_value, 1, "W L2 CONS"],
-["DSMR_PWR_L3_CONS", "61.7.0", "u", str_value, num_value, 1, "W L3 CONS"],
-["DSMR_PWR_L1_PROD", "22.7.0", "u", str_value, num_value, 1, "W L1 PROD"],
-["DSMR_PWR_L2_PROD", "42.7.0", "u", str_value, num_value, 1, "W L2 PROD"],
-["DSMR_PWR_L3_PROD", "62.7.0", "u", str_value, num_value, 1, "W L3 PROD"],
-["DSMR_GAS_SERIAL_NUM", "96.1.0", "s", str_value, num_value, 1, ""],
-["DSMR_GAS_TIME_STAMP", "24.2.1", "t", str_value, num_value, 1, ""],
-["DSMR_GAS_VOLUME", "24.2.1", "u", str_value, num_value, 1000, "m3"]
-]
 
 # -----------------------------------------------------------------------------
 # --- BASELOAD global constants and variables ---------------------------------------------------------

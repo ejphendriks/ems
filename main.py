@@ -408,6 +408,7 @@ class SimpleCLI:
 # ---- SHOW -------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
+    # --- debug --- 
     def show_all(self):
         
         # load threads 
@@ -433,18 +434,57 @@ class SimpleCLI:
         print(f"[MAIN] globl.power_cons: {globl.power_cons} Watt")
         print(f"[MAIN] globl.power_prod: {globl.power_prod} Watt\n")
 
+    # --- show converted battery (=marstek) values ------------------------------------ 
+    
+    def show_batt(self):
+        
+        print("[BATT] GR | NAME                     |                VALUE | UNIT | DESC .... ")
+        print("[BATT] ---+--------------------------+----------------------+------+------------------")
+
+        for indx in range(1, len(globl.BATT_REGISTER_LIST)): # --- start with 1 becaue of the header
+        #for indx in range(4, 10): # --- start with 1 because of the header    
+            reg_name = globl.BATT_REGISTER_LIST[indx][globl.IDXB_NAME]
+            reg_abbr = globl.BATT_REGISTER_LIST[indx][globl.IDXB_ABBR]
+            reg_conv = globl.BATT_REGISTER_LIST[indx][globl.IDXB_CONV]
+            reg_unit = globl.BATT_REGISTER_LIST[indx][globl.IDXB_UNIT]
+            reg_desc = globl.BATT_REGISTER_LIST[indx][globl.IDXB_DESC]
+            if isinstance(reg_conv, float):
+                print(f"[BATT] {reg_abbr} | {reg_name:<24} | {reg_conv:>20.2f} | {reg_unit:<4} | {reg_desc}")
+            else:
+                print(f"[BATT] {reg_abbr} | {reg_name:<24} | {reg_conv:>20} | {reg_unit:<4} | {reg_desc}")
+                
+        print("[BATT] ---+--------------------------+----------------------+------+------------------")
+
+    # --- show converted home (=dsmr) values ------------------------------------ 
+
+    def show_home(self):
+
+        print("[HOME] GR | NAME                     | VALUE | UNIT | DESC .... ")
+        print("[HOME] ---+--------------------------+-------+------+------------------")
+
+
+
+
+    # ---------------------
         
     def show(self, argument):
         if argument.strip() == "all":
             self.show_all()
+        elif argument.strip() == "batt":
+            self.show_batt()
+        elif argument.strip() == "home":
+            self.show_home()
         else:
             print(f"Unknown show command: (type 'help')")
             print("  show all")
+            print("  show batt")
+            print("  show home")
+
             
     def toggle(self, argument):
-        if argument.strip() == "batt":
-            globl.log_debug(module_name, "Toggle BATT modbus data...")
-            globl.show_batt = not globl.show_batt
+        if argument.strip() == "mrst":
+            globl.log_debug(module_name, "Toggle Marstek modbus data...")
+            globl.show_mrst = not globl.show_mrst
         elif argument.strip() == "dsmr":
             globl.log_debug(module_name, "Toggle DSMR (P1) data...")
             globl.show_dsmr = not globl.show_dsmr
@@ -456,7 +496,7 @@ class SimpleCLI:
             globl.show_debug = not globl.show_debug
         else:
             print(f"unknown toggle argument: (type 'help')")
-            print("  toggle batt")
+            print("  toggle mrst")
             print("  toggle dsmr")
             print("  toggle bsld")
             #print("  toggle log")
@@ -498,7 +538,8 @@ class SimpleCLI:
                 print("commands:")
                 print("  start ... - start threads")
                 print("  stop ... - stop threads")
-                print("  toggle ... - show batt, dsmr, bsld...")
+                print("  show ... - batt, home")
+                print("  toggle ... - show mrst, dsmr, bsld...")
                 print("  help - show this help")
                 print("  exit - stop and exit")
                 
