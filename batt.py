@@ -28,6 +28,9 @@ from pymodbus.client import ModbusSerialClient
 module_name = "MRST"
 # -----------------------------------------------------------------
 
+MODBUS_DEVICE = "/dev/ttyUSB0"
+MODBUS_BAUD = 115200
+
 # -----------------------------------------------------------------
 # --- Index MODBUS registers/groups for Marstek Venus E V20 -------
 # -----------------------------------------------------------------
@@ -319,11 +322,11 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
     unit_id=1
     max_charge_pwr = 1600
 
-    serial_port = "/dev/ttyUSB0"
+    serial_port = MODBUS_DEVICE
     client = ModbusSerialClient(
         framer="rtu",
         port=serial_port,
-        baudrate=115200,
+        baudrate=MODBUS_BAUD,
         bytesize=8,
         parity='N',
         stopbits=1,

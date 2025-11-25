@@ -66,14 +66,6 @@ module_name = "MAIN"
 # --- CONST -------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
-MODBUS_DEVICE = "/dev/ttyUSB0"
-MODBUS_BAUD = 115200
-    
-DSMR_HOST = "192.168.101.182"
-DSMR_PORT = 23
-    
-BASELOAD_CSV = "baseload.csv"
-LOG_CSV = "logs.csv"
 
 
 # -----------------------------------------------------------------------------
@@ -85,17 +77,17 @@ LOG_CSV = "logs.csv"
 # -----------------------------------------------------------------------------
 
 # initializing the header and data list for baseload
-baseload_header = []
-baseload_data = []
+#baseload_header = []
+#baseload_data = []
 
 str_telegram = "/ISK5\2M550T-1012"  # hold the incoming p1 telegram as a string
 
 # ---- Protected by locks -----------------------------------------------------
 
-batt_lock = threading.Lock()
-dsmr_lock = threading.Lock()
-base_lock = threading.Lock()
-ems_lock = threading.Lock()
+#batt_lock = threading.Lock()
+#dsmr_lock = threading.Lock()
+#base_lock = threading.Lock()
+#ems_lock = threading.Lock()
 
 # -----------------------------------------------------------------------------
 # ---- Global thread control --------------------------------------------------
