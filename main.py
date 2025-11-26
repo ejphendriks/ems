@@ -66,7 +66,7 @@ module_name = "MAIN"
 # --- CONST -------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
-
+ERWIN = 68
 
 # -----------------------------------------------------------------------------
 # ---- Configurable defaults --------------------------------------------------
@@ -418,23 +418,21 @@ class SimpleCLI:
         #ems_stop_event.set()
 
         for thread in threads:
-            print(f"thread: {thread}")
+            print(f"thread: {thread} is running")
         
         # updated in dsmr and made available via global variables in globl.py
-        # - globl.power_cons 
-        # - globl.power_prod 
         print(f"[MAIN] globl.power_cons: {globl.power_cons} Watt")
         print(f"[MAIN] globl.power_prod: {globl.power_prod} Watt\n")
 
     # --- show converted battery (=marstek) values ------------------------------------ 
     
     def show_batt(self):
-        
+        # --- Print battery settings
+        print()
         print("[BATT] GR | NAME                     |                VALUE | UNIT | DESC .... ")
         print("[BATT] ---+--------------------------+----------------------+------+------------------")
-
+        # --- start index with 1 because of header row
         for indx in range(1, len(globl.BATT_REGISTER_LIST)): # --- start with 1 becaue of the header
-        #for indx in range(4, 10): # --- start with 1 because of the header    
             reg_name = globl.BATT_REGISTER_LIST[indx][globl.IDXB_NAME]
             reg_abbr = globl.BATT_REGISTER_LIST[indx][globl.IDXB_ABBR]
             reg_conv = globl.BATT_REGISTER_LIST[indx][globl.IDXB_CONV]
@@ -445,34 +443,62 @@ class SimpleCLI:
             else:
                 print(f"[BATT] {reg_abbr} | {reg_name:<24} | {reg_conv:>20} | {reg_unit:<4} | {reg_desc}")
                 
-        print("[BATT] ---+--------------------------+----------------------+------+------------------")
+        print("[BATT] ---+--------------------------+----------------------+------+------------------\n")
 
-    # --- show converted home (=dsmr) values ------------------------------------ 
+    # --- show converted home (=dsmr + batt) values ------------------------------------ 
 
     def show_home(self):
-
-        print("[HOME] GR | NAME                     | VALUE | UNIT | DESC .... ")
-        print("[HOME] ---+--------------------------+-------+------+------------------")
-
-
-
-
-    # ---------------------
+        # --- Print HOME overview
+        print("[HOME] | NAME                     | VALUE | UNIT  ")
+        print("[HOME] +--------------------------+-------+---------")
+        # --- Calculate the actual and print total power usage
+        print(f"[HOME] | HOME total power         | {globl.power_tot:>8.2f} | Watt")
+        print(f"[HOME] | HOME L1 power            | {globl.power_l1:>8.2f} | Watt")
+        print(f"[HOME] | HOME L2 power            | {globl.power_l2:>8.2f} | Watt")
+        print(f"[HOME] | HOME L3 power            | {globl.power_l3:>8.2f} | Watt")
+        # --- Print AC power
+        reg_name = globl.BATT_REGISTER_LIST[globl.BATT_AC_PWR_VAL][globl.IDXB_NAME]
+        reg_conv = globl.BATT_REGISTER_LIST[globl.BATT_AC_PWR_VAL][globl.IDXB_CONV]
+        print(f"[BATT] | {reg_name:<24} | {reg_conv:>8.2f} | Watt ")
+        # --- Print DC power
+        reg_name = globl.BATT_REGISTER_LIST[globl.BATT_DC_PWR_VAL][globl.IDXB_NAME]
+        reg_conv = globl.BATT_REGISTER_LIST[globl.BATT_DC_PWR_VAL][globl.IDXB_CONV]
+        print(f"[BATT] | {reg_name:<24} | {reg_conv:>8.2f} | Watt ")
+        # --- Print DC SoC
+        reg_name = globl.BATT_REGISTER_LIST[globl.BATT_DC_SOC][globl.IDXB_NAME]
+        reg_conv = globl.BATT_REGISTER_LIST[globl.BATT_DC_SOC][globl.IDXB_CONV]
+        print(f"[BATT] | {reg_name:<24} | {reg_conv:>8.2f} | %")
+        print("[HOME] +--------------------------+-------+---------\n")
+        
+    # ----------------------------------------------------------------------------
         
     def show(self, argument):
         if argument.strip() == "all":
             self.show_all()
         elif argument.strip() == "batt":
+            globl.log_debug(module_name, "Show BATT data...")
             self.show_batt()
+        elif argument.strip() == "dsmr":
+            #self.show_dsmr()
+            globl.log_debug(module_name, "Show DSMR (P1) data...")
+            globl.show_dsmr = True
         elif argument.strip() == "home":
+            globl.log_debug(module_name, "Show HOME energy/power...")
             self.show_home()
+        elif argument.strip() == "mrst":
+            #self.show_mrst()
+            globl.log_debug(module_name, "Show Marstek modbus data...")
+            globl.show_mrst = True
         else:
             print(f"Unknown show command: (type 'help')")
-            print("  show all")
-            print("  show batt")
-            print("  show home")
+            print("  show all  - show all ...")
+            print("  show batt - battery parameters")
+            print("  show dsmr - dsmr obis values")
+            print("  show home - home energy usage")
+            print("  show mrst - modbus registers")
 
-            
+    # ----------------------------------------------------------------------------
+    
     def toggle(self, argument):
         if argument.strip() == "mrst":
             globl.log_debug(module_name, "Toggle Marstek modbus data...")
@@ -483,6 +509,9 @@ class SimpleCLI:
         elif argument.strip() == "bsld":
             globl.log_debug(module_name, "Toggle Baseload data...")
             globl.show_bsld = not globl.show_bsld
+        elif argument.strip() == "loop":
+            globl.log_debug(module_name, "Toggle loop data...")
+            globl.show_loop = not globl.show_loop
         elif argument.strip() == "debug":
             globl.log_debug(module_name, "Toggle DEBUG data...")
             globl.show_debug = not globl.show_debug
@@ -494,6 +523,69 @@ class SimpleCLI:
             #print("  toggle log")
             #print("  toggle ems")
             print("  toggle debug")
+
+    def mode(self, argument):
+        if argument.strip() == "manual":
+            globl.log_debug(module_name, "Mode set to manual...")
+            globl.mode_baseload = False
+            globl.mode_manual = True
+        elif argument.strip() == "baseload":
+            globl.log_debug(module_name, "Mode set to baseload...")
+            globl.mode_manual = False
+            globl.mode_baseload = True
+        else:
+            print(f"unknown mode argument: (type 'help')")
+            print("  mode manual")
+            print("  mode baseload")
+
+    def batt(self, argument):
+        if argument.strip() == "restart":
+            globl.log_debug(module_name, "Marstek restart")
+            globl.batt_restart = True
+        elif argument.strip() == "rtu":
+            globl.log_debug(module_name, "Marstek set to RTU mode")
+            globl.batt_rtu = True
+        elif argument.strip() == "stop":
+            globl.log_debug(module_name, "Marstek stop charging/discharging")
+            globl.set_inv_state = globl.INV_STATE_STOP
+            globl.mode_changed = True
+        elif argument.strip() == "charge":
+            globl.log_debug(module_name, "Marstek start charging")
+            globl.set_inv_state = globl.INV_STATE_CHARGE
+            globl.mode_changed = True
+        elif argument.strip() == "discharge":
+            globl.log_debug(module_name, "Marstek start discharging")
+            globl.set_inv_state = globl.INV_STATE_DISCHARGE
+            globl.mode_changed = True
+        else:
+            try:
+                power = int(argument)
+                if (power == 0):
+                    globl.log_debug(module_name, "Marstek stop")
+                    globl.set_pwr_charge = 0
+                    globl.set_pwr_discharge = 0
+                    globl.set_inv_state = globl.INV_STATE_STOP
+                    globl.mode_changed = True
+                if (power > 0 and power <= 2500):
+                    globl.log_debug(module_name, f"Marstek start charging {power}")
+                    globl.set_pwr_charge = power
+                    globl.set_inv_state = globl.INV_STATE_CHARGE
+                    globl.mode_changed = True
+                elif (power < 0 and power >= -2500):
+                    globl.log_debug(module_name, f"Marstek start discharging {power}")
+                    globl.set_pwr_discharge = -power # --- Invert to positive power 
+                    globl.set_inv_state = globl.INV_STATE_DISCHARGE
+                    globl.mode_changed = True
+            except ValueError:
+                print(f"set battery mode: (type 'help')")
+                print("  batt restart")
+                print("  batt rtu")
+                print("  batt stop")
+                print("  batt charge")
+                print("  batt discharge")
+                print("  batt <power>")
+                globl.log_debug(module_name, f"Incorrect power value: -2500..2500")
+                globl.mode_changed = False
 
 # -----------------------------------------------------------------------------
 # ---- RUN SimpleCLI --------------------------------------------------------
@@ -550,6 +642,14 @@ class SimpleCLI:
             elif cmd == "toggle":
                 if len(args) == 1:
                     self.toggle(args[0])
+                    
+            elif cmd == "mode":
+                if len(args) == 1:
+                    self.mode(args[0])
+                    
+            elif cmd == "batt":
+                if len(args) == 1:
+                    self.batt(args[0])
 
             else:
                 print(f"Unknown command: {cmd} (type 'help')")

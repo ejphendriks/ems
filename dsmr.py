@@ -136,37 +136,51 @@ DSMR_OBIS_LIST = [
 # --- DSMR thread -------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------
 
-def lookup_dsmr_value(telegram):
+def print_numeric_value(item):
+    # --- if printing is requested
+    if globl.show_dsmr:
+        # --- Print incl the nummeric value and units
+        if (len(DSMR_OBIS_LIST[item][IDXD_NAME]) >= 17): # only for outlining and formatting 
+            if globl.show_dsmr: print(f"[DSMR] {DSMR_OBIS_LIST[item][IDXD_NAME]}\t{DSMR_OBIS_LIST[item][IDXD_OBIS]} \t = {DSMR_OBIS_LIST[item][IDXD_SVAL]} \t = {DSMR_OBIS_LIST[item][IDXD_NVAL]} {DSMR_OBIS_LIST[item][IDXD_UNIT]}")
+        else:
+            if globl.show_dsmr: print(f"[DSMR] {DSMR_OBIS_LIST[item][IDXD_NAME]}\t\t{DSMR_OBIS_LIST[item][IDXD_OBIS]} \t = {DSMR_OBIS_LIST[item][IDXD_SVAL]} \t = {DSMR_OBIS_LIST[item][IDXD_NVAL]} {DSMR_OBIS_LIST[item][IDXD_UNIT]}")
+
+def print_string_value(item):
+    # --- if printing is requested
+    if globl.show_dsmr:
+        # --- Print the string value and no units
+        if (len(DSMR_OBIS_LIST[item][IDXD_NAME]) >= 17): # only for outlining and formatting 
+            print(f"[DSMR] {DSMR_OBIS_LIST[item][IDXD_NAME]}\t{DSMR_OBIS_LIST[item][IDXD_OBIS]} \t = {DSMR_OBIS_LIST[item][IDXD_SVAL]}")
+        else:
+            print(f"[DSMR] {DSMR_OBIS_LIST[item][IDXD_NAME]}\t\t{DSMR_OBIS_LIST[item][IDXD_OBIS]} \t = {DSMR_OBIS_LIST[item][IDXD_SVAL]}")
     
-    for item in range(len(DSMR_OBIS_LIST)-1):   # Calculate DSMR_GAS_VOLUME separately (-1)
+# -----------------------------------------------------------------------------------------
+
+def lookup_dsmr_value(telegram):
+    # Lookup Electric values and DSMR_GAS_VOLUME separately (-1)
+    for item in range(len(DSMR_OBIS_LIST)-1):   
         indx_obis = telegram.find(DSMR_OBIS_LIST[item][IDXD_OBIS])
         indx_open_bracket = telegram[indx_obis:].find("(") + indx_obis + 1
         indx_close_bracket = telegram[indx_open_bracket:].find(")") + indx_open_bracket
         DSMR_OBIS_LIST[item][IDXD_SVAL] = telegram[indx_open_bracket:indx_close_bracket]
-    
         if (DSMR_OBIS_LIST[item][IDXD_TYPE] == "u"): # if unsigned int --> number
             DSMR_OBIS_LIST[item][IDXD_NVAL] = int(''.join(filter(str.isdigit, DSMR_OBIS_LIST[item][IDXD_SVAL]))) / DSMR_OBIS_LIST[item][IDXD_DIVR]
-            # --- Print incl the nummeric value and units
-            if (len(DSMR_OBIS_LIST[item][IDXD_NAME]) >= 17): # only for outlining and formatting 
-                if globl.show_dsmr: print(f"[DSMR] {DSMR_OBIS_LIST[item][IDXD_NAME]}\t{DSMR_OBIS_LIST[item][IDXD_OBIS]} \t = {DSMR_OBIS_LIST[item][IDXD_SVAL]} \t = {DSMR_OBIS_LIST[item][IDXD_NVAL]} {DSMR_OBIS_LIST[item][IDXD_UNIT]}")
-            else:
-                if globl.show_dsmr: print(f"[DSMR] {DSMR_OBIS_LIST[item][IDXD_NAME]}\t\t{DSMR_OBIS_LIST[item][IDXD_OBIS]} \t = {DSMR_OBIS_LIST[item][IDXD_SVAL]} \t = {DSMR_OBIS_LIST[item][IDXD_NVAL]} {DSMR_OBIS_LIST[item][IDXD_UNIT]}")
+            print_numeric_value(item)
         else: # No need to print the nummeric value and unit because string or timestamp
-            if (len(DSMR_OBIS_LIST[item][IDXD_NAME]) >= 17): # only for outlining and formatting 
-                if globl.show_dsmr: print(f"[DSMR] {DSMR_OBIS_LIST[item][IDXD_NAME]}\t{DSMR_OBIS_LIST[item][IDXD_OBIS]} \t = {DSMR_OBIS_LIST[item][IDXD_SVAL]}")
-            else:
-                if globl.show_dsmr: print(f"[DSMR] {DSMR_OBIS_LIST[item][IDXD_NAME]}\t\t{DSMR_OBIS_LIST[item][IDXD_OBIS]} \t = {DSMR_OBIS_LIST[item][IDXD_SVAL]}")
-
+            print_string_value(item)
+            
     # --- Calculate DSMR_GAS_VOLUME separately (+1)
     indx_open_bracket = telegram[indx_close_bracket:].find("(") + indx_close_bracket + 1 # --- find next opening bracket
     indx_close_bracket = telegram[indx_open_bracket:].find(")") + indx_open_bracket      # --- find next closing bracket  
     item += 1 # this applies to the next row: DSMR_GAS_VOLUME
     DSMR_OBIS_LIST[item][IDXD_SVAL] = telegram[indx_open_bracket:indx_close_bracket - 1] # The -1 is needed to remove the extra 3 from "m3"
     DSMR_OBIS_LIST[item][IDXD_NVAL] = int(''.join(filter(str.isdigit, DSMR_OBIS_LIST[item][IDXD_SVAL]))) / DSMR_OBIS_LIST[item][IDXD_DIVR]
-
     # --- Only print DSMR data if requested
     if globl.show_dsmr: print(f"[DSMR] {DSMR_OBIS_LIST[item][IDXD_NAME]}\t\t{DSMR_OBIS_LIST[item][IDXD_OBIS]} \t = {DSMR_OBIS_LIST[item][IDXD_SVAL]} \t = {DSMR_OBIS_LIST[item][IDXD_NVAL]} {DSMR_OBIS_LIST[item][IDXD_UNIT]}")
+    # --- reset print flag (always)
+    globl.show_dsmr = False
 
+# -----------------------------------------------------------------------------------------
 
 def dsmr_thread_fn(dsmr_stop_event: threading.Event, interval: float = 2.0):
 
@@ -195,7 +209,11 @@ def dsmr_thread_fn(dsmr_stop_event: threading.Event, interval: float = 2.0):
                     # make available in ems thread via global variables
                     globl.power_cons = DSMR_OBIS_LIST[DSMR_PWR_TOT_CONS][IDXD_NVAL]
                     globl.power_prod = DSMR_OBIS_LIST[DSMR_PWR_TOT_PROD][IDXD_NVAL]
-
+                    globl.power_tot = globl.power_cons - globl.power_prod 
+                    globl.power_l1 = DSMR_OBIS_LIST[DSMR_PWR_L1_CONS][IDXD_NVAL] - DSMR_OBIS_LIST[DSMR_PWR_L1_PROD][IDXD_NVAL]
+                    globl.power_l2 = DSMR_OBIS_LIST[DSMR_PWR_L2_CONS][IDXD_NVAL] - DSMR_OBIS_LIST[DSMR_PWR_L2_PROD][IDXD_NVAL]
+                    globl.power_l3 = DSMR_OBIS_LIST[DSMR_PWR_L3_CONS][IDXD_NVAL] - DSMR_OBIS_LIST[DSMR_PWR_L3_PROD][IDXD_NVAL]
+                    
                     # calculate het voortschrijdend gemiddelde
                     #int_pwr_cons[0-9] = ++ ... / 10 etc
                     
@@ -210,4 +228,4 @@ def dsmr_thread_fn(dsmr_stop_event: threading.Event, interval: float = 2.0):
                 pass
 
         cntr += 1
-        globl.log_debug(module_name, f"Loop counter: {cntr}")
+        globl.log_loop(module_name, f"Loop counter: {cntr}")

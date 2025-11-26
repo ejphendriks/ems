@@ -32,4 +32,4 @@ def ems_thread_fn(ems_stop_event: threading.Event, interval: float = 2.0):
     while not ems_stop_event.is_set():
         cntr += 1
         time.sleep(interval)
-        globl.log_debug(module_name, f"Loop counter {cntr}")
+        globl.log_loop(module_name, f"Loop counter {cntr}")

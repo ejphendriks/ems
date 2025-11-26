@@ -34,7 +34,7 @@ def logger_thread_fn(log_stop_event: threading.Event, interval: float = 1.0):
         # updated in dsmr and made available via global variables in globl.py
         # - globl.power_cons 
         # - globl.power_prod 
-        globl.log_debug(module_name, f"globl.power_cons: {globl.power_cons} Watt")
-        globl.log_debug(module_name, f"globl.power_prod: {globl.power_prod} Watt")
+        #globl.log_debug(module_name, f"globl.power_cons: {globl.power_cons} Watt")
+        #globl.log_debug(module_name, f"globl.power_prod: {globl.power_prod} Watt")
         time.sleep(interval)
-        globl.log_debug(module_name, f"Loop counter {cntr}")
+        globl.log_loop(module_name, f"Loop counter {cntr}")

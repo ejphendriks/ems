@@ -21,11 +21,69 @@ from pymodbus.client import ModbusSerialClient
 # ---- Global flags for triggering events and logging -------------------------
 # -----------------------------------------------------------------------------
 
+# --- Constant used for setting the Marstek Invert State
+INV_STATE_STOP = 0
+INV_STATE_CHARGE = 1
+INV_STATE_DISCHARGE = 2
+
 show_dsmr = False
 show_batt = False
+show_mrst = False
 show_bsld = False
+show_loop = False
+show_debug = True
 
-show_debug = False
+mode_baseload = False
+mode_manual = True
+mode_changed = False
+
+set_pwr_charge = 680
+set_pwr_discharge = 450
+set_inv_state = INV_STATE_STOP
+
+batt_restart = False
+batt_rtu = False
+
+
+# -----------------------------------------------------------------------------
+# ---- GLOBAL HOME power values from P1 meter ---------------------------------
+# -----------------------------------------------------------------------------
+
+# --- Global DMSR power variables
+power_cons = 0          # global power consumed
+power_prod = 0          # global power produced
+power_tot = 0
+power_l1 = 0
+power_l2 = 0
+power_l3 = 0
+
+# --- Index list for Home Power
+HOME_PWR_TIME_STAMP = 0     # ---  Timestamp power
+HOME_PWR_CONS = 1           # ---  Power consumed total (unsigned always positive)
+HOME_PWR_PROD = 2           # ---  Power produced total (unsigned always positive)
+HOME_PWR_TOT = 3            # ---  Power total (signed, consume is positive)
+HOME_PWR_L1 = 4             # ---  Power phase 1 (signed, consume is positive)
+HOME_PWR_L2 = 5             # ---  Power phase 2 (signed, consume is positive)
+HOME_PWR_L3 = 6             # ---  Power phase 3 (signed, consume is positive)
+
+init_value = 0
+
+HOME_POWER = [
+["HOME_PWR_TIME_STAMP","t",init_value,""],
+["HOME_PWR_CONS","u",init_value,"W"],
+["HOME_PWR_PROD","u",init_value,"W"],
+["HOME_PWR_TOT","s",init_value,"W"],
+["HOME_PWR_L1","s",init_value,"W"],
+["HOME_PWR_L2","s",init_value,"W"],
+["HOME_PWR_L3","s",init_value,"W"]
+]
+
+# --- HOME_FIELD_INDEX index for HOME POWER values  
+IDXH_NAME = 0
+IDXH_SIGN = 1
+IDXH_HVAL = 2
+IDXH_UNIT = 3
+
 
 # -----------------------------------------------------------------------------
 # ---- BATT fields taking values from MRST ------------------------------------
@@ -61,7 +119,7 @@ BATT_MOS1_TEMP = 26 #  35001 u16 0.1C
 BATT_MOS2_TEMP = 27 #  35002 u16 0.1C 
 BATT_MAX_CELL_TEMP = 28 #  35010 u16 0.1C 
 BATT_MIN_CELL_TEMP = 29 #  35011 u16 0.1C 
-BATT_INV_STATE = 30 #  35100 u16 n.a. 0:sleep, 1:standby, 2:charging, 3:discharging, 4:backup, 5:upgrading
+BATT_GET_INV_STATE = 30 #  35100 u16 n.a. 0:sleep, 1:standby, 2:charging, 3:discharging, 4:backup, 5:upgrading
 BATT_LIMIT_VOLT = 31 #  35110 u16 100mv 
 BATT_LIMIT_CHARGE_CURR = 32 #  35111 u16 100ma 
 BATT_LIMIT_DISCHARG_CURR = 33 #  35112 u16 100ma 
@@ -72,7 +130,7 @@ BATT_RESTART = 37 #  41000 u16 n.a. restart write 0x55AA
 BATT_UNIT_ID = 38 #  41100 u16 n.a. Set the Unit ID / Device ID
 BATT_BACKUP = 39 #  41200 u16 n.a. 0: enable backup, 1: disable backup
 BATT_RTU_MODE = 40 #  42000 u16 n.a. enable RS485 mode 0x55AA, disable: 0x55BB
-BATT_INV_STATE = 41 #  42010 u16 n.a. 0:stop, 1:charge, 2:discharge
+BATT_SET_INV_STATE = 41 #  42010 u16 n.a. 0:stop, 1:charge, 2:discharge
 BATT_CHARGE_TO_SOC = 42 #  42011 u16 0,01 set charge to SoC value in 1%
 BATT_PWR_CHARGE = 43 #  42020 u16 1W set charging power [0-2500W]
 BATT_PWR_DISCHARGE = 44 #  42021 u16 1W set discharging power [0-2500W]
@@ -115,7 +173,7 @@ BATT_REGISTER_LIST = [
 [27,"BATT_MOS2_TEMP","TP",cvalue,"°C",""],
 [28,"BATT_MAX_CELL_TEMP","CT",cvalue,"°C",""],
 [29,"BATT_MIN_CELL_TEMP","CT",cvalue,"°C",""],
-[30,"BATT_INV_STATE","IS",cvalue," ",""],
+[30,"BATT_GET_INV_STATE","GI",cvalue," ","0:sleep, 1:standby, 2:charging, 3:discharging, 4:backup, 5:upgrade"],
 [31,"BATT_LIMIT_VOLT","LT",cvalue,"mv",""],
 [32,"BATT_LIMIT_CHARGE_CURR","LT",cvalue,"ma",""],
 [33,"BATT_LIMIT_DISCHARG_CURR","LT",cvalue,"ma",""],
@@ -126,7 +184,7 @@ BATT_REGISTER_LIST = [
 [38,"BATT_UNIT_ID","UI",cvalue," ","unit id [1..255]"],
 [39,"BATT_BACKUP","BK",cvalue," ","0:enable, 1:disbale"],
 [40,"BATT_RTU_MODE","RM",cvalue," ","ON:0x55AA, OFF: 0x55BB"],
-[41,"BATT_INV_STATE","IV",cvalue," ","0:stop,1:charge,2:discharge"],
+[41,"BATT_SET_INV_STATE","SI",cvalue," ","0:stop, 1:charge, 2:discharge"],
 [42,"BATT_CHARGE_TO_SOC","IV",cvalue," ","charge to target SOC"],
 [43,"BATT_PWR_CHARGE","PW",cvalue,"W","range:[0..2500W]"],
 [44,"BATT_PWR_DISCHARGE","PW",cvalue,"W","range:[0..2500W]"],
@@ -181,9 +239,14 @@ ems_lock = threading.Lock()
 # -----------------------------------------------------------------------------
 
 
-# --- create log sentence
+# --- log debug sentence
 def log_debug(module, sentence):
     if show_debug:
+        print(f"[{datetime.utcnow().isoformat(timespec='seconds')}Z] [{module}] - {sentence}")
+
+# --- log loop sentence
+def log_loop(module, sentence):
+    if show_loop:
         print(f"[{datetime.utcnow().isoformat(timespec='seconds')}Z] [{module}] - {sentence}")
 
 # -----------------------------------------------------------------------------
@@ -205,31 +268,11 @@ baseload_data = []
 
 # -----------------------------------------------------------------------------
 
-#ems_state = []          # latest EMS calculations / results
-
-# -----------------------------------------------------------------------------
-
-power_cons = 0          # global power consumed
-power_prod = 0          # global power produced
-
 # -----------------------------------------------------------------------------
 
 str_telegram = "/ISK5\2M550T-1012"  # hold the incoming p1 telegram as a string
 
 # -----------------------------------------------------------------------------
 
-
-# -----------------------------------------------------------------------------
-# --- CONST declarations ------------------------------------------------------
-# -----------------------------------------------------------------------------
-
-#MODBUS_DEVICE = "/dev/ttyUSB0"
-#MODBUS_BAUD = 115200
-    
-#DSMR_HOST = "192.168.101.182"
-#DSMR_PORT = 23
-    
-#BASELOAD_CSV = "baseload.csv"
-#LOG_CSV = "log.csv"
 
 

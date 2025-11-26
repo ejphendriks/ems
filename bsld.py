@@ -79,6 +79,6 @@ def baseload_thread_fn(bsld_stop_event: threading.Event, interval: float = 1.0):
             csvfile.close()
 
         cntr += 1
-        globl.log_debug(module_name, f"Loop counter {cntr}")
+        globl.log_loop(module_name, f"Loop counter {cntr}")
         time.sleep(interval)
         

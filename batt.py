@@ -65,7 +65,7 @@ MRST_MOS1_TEMP = 50 #  35001 1 u16 0.1C
 MRST_MOS2_TEMP = 51 #  35002 1 u16 0.1C 
 MRST_MAX_CELL_TEMP = 52 #  35010 1 u16 0.1C 
 MRST_MIN_CELL_TEMP = 53 #  35011 1 u16 0.1C 
-MRST_INV_STATE = 54 #  35100 1 u16 n.a. 0:sleep, 1:standby, 2:charging, 3:discharging, 4:backup, 5:upgrading
+MRST_GET_INV_STATE = 54 #  35100 1 u16 n.a. 0:sleep, 1:standby, 2:charging, 3:discharging, 4:backup, 5:upgrade
 MRST_LIMIT_VOLT = 55 #  35110 1 u16 100mv 
 MRST_LIMIT_CHARGE_CURR = 56 #  35111 1 u16 100ma 
 MRST_LIMIT_DISCHARG_CURR = 57 #  35112 1 u16 100ma 
@@ -76,7 +76,7 @@ MRST_RESTART = 61 #  41000 1 u16 n.a. restart write 0x55AA
 MRST_UNIT_ID = 62 #  41100 1 u16 n.a. Set the Unit ID / Device ID
 MRST_BACKUP = 63 #  41200 1 u16 n.a. 0: enable backup, 1: disable backup
 MRST_RTU_MODE = 64 #  42000 1 u16 n.a. enable RS485 mode 0x55AA, disable: 0x55BB
-MRST_INV_STATE = 65 #  42010 1 u16 n.a. 0:stop, 1:charge, 2:discharge
+MRST_SET_INV_STATE = 65 #  42010 1 u16 n.a. 0:stop, 1:charge, 2:discharge
 MRST_CHARGE_TO_SOC = 66 #  42011 1 u16 0,01 set charge to SoC value in 1%
 MRST_PWR_CHARGE = 67 #  42020 1 u16 1W set charging power [0-2500W]
 MRST_PWR_DISCHARGE = 68 #  42021 1 u16 1W set discharging power [0-2500W]
@@ -149,7 +149,7 @@ MARSTEK_MODBUS = [
 [51,"MRST_MOS2_TEMP",35002,"TP",0,2,"R","u",raw_value,0.1,con_value,"°C",""],
 [52,"MRST_MAX_CELL_TEMP",35010,"CT",2,0,"R","u",raw_value,0.1,con_value,"°C",""],
 [53,"MRST_MIN_CELL_TEMP",35011,"CT",0,1,"R","u",raw_value,0.1,con_value,"°C",""],
-[54,"MRST_INV_STATE",35100,"IS",1,0,"R","u",raw_value,1,con_value," ",""],
+[54,"MRST_GET_INV_STATE",35100,"GI",1,0,"R","u",raw_value,1,con_value," ","State[0,1,2:chrg,3:disch,4,5]"],
 [55,"MRST_LIMIT_VOLT",35110,"LT",3,0,"R","u",raw_value,100,con_value,"mv",""],
 [56,"MRST_LIMIT_CHARGE_CURR",35111,"LT",0,1,"R","u",raw_value,100,con_value,"ma",""],
 [57,"MRST_LIMIT_DISCHARG_CURR",35112,"LT",0,2,"R","u",raw_value,100,con_value,"ma",""],
@@ -160,8 +160,8 @@ MARSTEK_MODBUS = [
 [62,"MRST_UNIT_ID",41100,"UI",1,0,"RW","u",raw_value,1,con_value," ","unit id [1..255]"],
 [63,"MRST_BACKUP",41200,"BK",1,0,"RW","u",raw_value,1,con_value," ","0:enable,1:disbale"],
 [64,"MRST_RTU_MODE",42000,"RM",1,0,"RW","u",raw_value,1,con_value," ","0x55AA=ON, 0x55BB=OFF"],
-[65,"MRST_INV_STATE",42010,"IV",2,0,"RW","u",raw_value,1,con_value," ","0:stop,1:charge,2:discharge"],
-[66,"MRST_CHARGE_TO_SOC",42011,"IV",0,1,"RW","u",raw_value,1,con_value,"%","charge to target SOC"],
+[65,"MRST_SET_INV_STATE",42010,"SI",2,0,"RW","u",raw_value,1,con_value," ","0:stop, 1:charge, 2:discharge"],
+[66,"MRST_CHARGE_TO_SOC",42011,"SI",0,1,"RW","u",raw_value,1,con_value,"%","charge to target SOC"],
 [67,"MRST_PWR_CHARGE",42020,"PW",2,0,"RW","u",raw_value,1,con_value,"W","range:[0..2500W]"],
 [68,"MRST_PWR_DISCHARGE",42021,"PW",0,1,"RW","u",raw_value,1,con_value,"W","range:[0..2500W]"],
 [69,"MRST_USER_MODE",43000,"UM",1,0,"RW","u",raw_value,1,con_value," ","0:manual,1:anti-feed,2:trade_mode"],
@@ -281,6 +281,9 @@ def print_modbus_registers(): # --- Print all registers in MARSTEK_MODBUS
     
     if globl.show_mrst:
         
+        # --- reset flag
+        globl.show_mrst = False
+        
         print("[MRST] GR | NAME                     |  REG  | ADDR HEX | VAL HEX | VAL DEC | VAL CONV | UNIT | DESC .... ")
         print("[MRST] ---+--------------------------+-------+----------+---------+---------+----------+------+-----------")
         
@@ -310,6 +313,7 @@ def print_modbus_registers(): # --- Print all registers in MARSTEK_MODBUS
                 print(f"[MRST] {reg_abbr} | {reg_name:<24} | {reg_addr:>5} |  0x{reg_addr:04X}  |  0x{reg_rawv:04X} | {reg_rawv:6}  | {reg_conv:>8} | {reg_unit:<4} | {reg_desc}")
                 
         print("[MRST] ---+--------------------------+-------+----------+---------+---------+----------+------+-----------")
+
 
     
 # -----------------------------------------------------------------------------------------
@@ -417,7 +421,7 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
                     copy_modbus_register_block(result, reg_block)
 
                 # --- INVerter STATE block
-                reg_block = MRST_INV_STATE
+                reg_block = MRST_GET_INV_STATE
                 result = client.read_holding_registers(address=MARSTEK_MODBUS[reg_block][IDXM_ADDR], count=MARSTEK_MODBUS[reg_block][IDXM_BLCK], device_id=unit_id)
                 if result.isError():
                     globl.log_debug(module_name, f"Read error: {result}")
@@ -475,7 +479,7 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
                     copy_modbus_register_block(result, reg_block)
 
                 # --- INVerter STATE - 0:stop, 1:charge, 2:discharge
-                reg_block = MRST_INV_STATE
+                reg_block = MRST_SET_INV_STATE
                 result = client.read_holding_registers(address=MARSTEK_MODBUS[reg_block][IDXM_ADDR], count=MARSTEK_MODBUS[reg_block][IDXM_BLCK], device_id=unit_id)
                 if result.isError():
                     globl.log_debug(module_name, f"Read error: {result}")
@@ -505,7 +509,77 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
                     globl.log_debug(module_name, f"Read error: {result}")
                 else: # copy modbus registers in MARSTEK_MODBUS list object
                     copy_modbus_register_block(result, reg_block)
+                            
+                if globl.mode_baseload:
+                    # ToDo: Implement PID controller that follows the DSMR
+                    
+                    if globl.mode_changed:
+                        # Reset the changed flag
+                        globl.mode_changed = False
+                        # --- ToDo: Check all the values
+                        print(f"HOME_POWER[HOME_PWR_TIME_STAMP] = {globl.HOME_POWER[globl.HOME_PWR_TIME_STAMP][globl.IDXH_HVAL]}")
+                        print(f"HOME_PWR_TOT = {globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL]}")
+                        print(f"HOME_PWR_L1 = {globl.HOME_POWER[globl.HOME_PWR_L1][globl.IDXH_HVAL]}")
+                        print(f"HOME_PWR_L2 = {globl.HOME_POWER[globl.HOME_PWR_L2][globl.IDXH_HVAL]}")
+                        print(f"HOME_PWR_L3 = {globl.HOME_POWER[globl.HOME_PWR_L3][globl.IDXH_HVAL]}")
+                        # --- ToDo: Implement PID controller that follows the DSMR
+                        home_tot_power = globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL]
+                        home_offset_power = 0 # --- This needs to be the Marstek set signed value 
+                        # --- ToDo: More implement PID EJPH XXX
+                        # --- Write the changes via MODBUS to the Marstek
+                        if MARSTEK_MODBUS[MRST_RTU_MODE][IDXM_CONV] != 0x55AA: # --- Check if already in RTU mode
+                            # --- Set value for MRST_RTU_MODE = 0x55AA (21930d)
+                            result = client.write_register(address=MARSTEK_MODBUS[MRST_RTU_MODE][IDXM_ADDR], value=0x55AA, device_id=unit_id)
+                            if result.isError():
+                                globl.log_debug(module_name, f"Write error: {result}")
+                        # --- Set value for MRST_PWR_CHARGE
+                        result = client.write_register(address=MARSTEK_MODBUS[MRST_PWR_CHARGE][IDXM_ADDR], value=globl.set_pwr_charge, device_id=unit_id)
+                        if result.isError():
+                            globl.log_debug(module_name, f"Write error: {result}")
+                        # --- Set value for MRST_PWR_DISCHARGE
+                        result = client.write_register(address=MARSTEK_MODBUS[MRST_PWR_DISCHARGE][IDXM_ADDR], value=globl.set_pwr_discharge, device_id=unit_id)
+                        if result.isError():
+                            globl.log_debug(module_name, f"Write error: {result}")
+                        # --- Set value for MRST_SET_INV_STATE
+                        result = client.write_register(address=MARSTEK_MODBUS[MRST_SET_INV_STATE][IDXM_ADDR], value=globl.set_inv_state, device_id=unit_id)
+                        if result.isError():
+                            globl.log_debug(module_name, f"Write error: {result}")
 
+
+                if globl.mode_manual:
+                    if globl.mode_changed:
+                        # Reset the changed flag
+                        globl.mode_changed = False
+                        # --- Check if already in RTU mode
+                        if MARSTEK_MODBUS[MRST_RTU_MODE][IDXM_CONV] != 0x55AA:
+                            # --- Set value for MRST_RTU_MODE = 0x55AA (21930d)
+                            result = client.write_register(address=MARSTEK_MODBUS[MRST_RTU_MODE][IDXM_ADDR], value=0x55AA, device_id=unit_id)
+                            if result.isError():
+                                globl.log_debug(module_name, f"Write error: {result}")
+                        # --- Set value for MRST_PWR_CHARGE
+                        result = client.write_register(address=MARSTEK_MODBUS[MRST_PWR_CHARGE][IDXM_ADDR], value=globl.set_pwr_charge, device_id=unit_id)
+                        if result.isError():
+                            globl.log_debug(module_name, f"Write error: {result}")
+                        # --- Set value for MRST_PWR_DISCHARGE
+                        result = client.write_register(address=MARSTEK_MODBUS[MRST_PWR_DISCHARGE][IDXM_ADDR], value=globl.set_pwr_discharge, device_id=unit_id)
+                        if result.isError():
+                            globl.log_debug(module_name, f"Write error: {result}")
+                        # --- Set value for MRST_SET_INV_STATE
+                        result = client.write_register(address=MARSTEK_MODBUS[MRST_SET_INV_STATE][IDXM_ADDR], value=globl.set_inv_state, device_id=unit_id)
+                        if result.isError():
+                            globl.log_debug(module_name, f"Write error: {result}")
+                    
+                    
+                # --- Restart marstek
+                if globl.batt_restart:
+                    print("[BATT] Restarting Marstek Venus E V2.0 ...")
+                    globl.batt_restart = False
+                    result = client.write_register(address=MARSTEK_MODBUS[MRST_RESTART][IDXM_ADDR], value=0x55AA, device_id=unit_id)
+                    if result.isError():
+                        globl.log_debug(module_name, f"Write error: {result}")
+                    else:
+                        globl.log_debug(module_name, f"Write succes: {result}")
+                            
                 # --- Convert all MODBUS registers and adjust gain
                 convert_modbus_registers()
 
@@ -515,13 +589,9 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
                 # --- Print all MODBUS registers
                 print_modbus_registers()
 
-                # --- 
-                #max_charge_pwr = max_charge_pwr + 1
-                #result = client.write_register(address=44002, value=max_charge_pwr, device_id=unit_id)
-
                 cntr += 1      # increment counter
                 time.sleep(2)  # delay between reads (interval)
-                globl.log_debug(module_name, f"Loop counter: {cntr}")
+                globl.log_loop(module_name, f"Loop counter: {cntr}")
                 
         except Exception as e:
             globl.log_debug(module_name, f"Exception: {e}")
