@@ -188,6 +188,15 @@ def dsmr_thread_fn(dsmr_stop_event: threading.Event, interval: float = 2.0):
     host = "192.168.101.182"
     port = 23
     p1_counter = 0
+
+    # --- moving average
+    win_2 = []
+    win_3 = []
+    win_4 = []
+    win_5 = []
+    win_6 = []
+    win_8 = []
+
     
     while not dsmr_stop_event.is_set():
         try:
@@ -206,16 +215,49 @@ def dsmr_thread_fn(dsmr_stop_event: threading.Event, interval: float = 2.0):
                 telegram = data.decode(errors='ignore')
                 if len(telegram) > 800:  # --- Only analyse p1 telegram if complete (>800char)
                     lookup_dsmr_value(telegram)
-                    # make available in ems thread via global variables
+                    # make available globally to all thread via global variables
                     globl.power_cons = DSMR_OBIS_LIST[DSMR_PWR_TOT_CONS][IDXD_NVAL]
                     globl.power_prod = DSMR_OBIS_LIST[DSMR_PWR_TOT_PROD][IDXD_NVAL]
                     globl.power_tot = globl.power_cons - globl.power_prod 
                     globl.power_l1 = DSMR_OBIS_LIST[DSMR_PWR_L1_CONS][IDXD_NVAL] - DSMR_OBIS_LIST[DSMR_PWR_L1_PROD][IDXD_NVAL]
                     globl.power_l2 = DSMR_OBIS_LIST[DSMR_PWR_L2_CONS][IDXD_NVAL] - DSMR_OBIS_LIST[DSMR_PWR_L2_PROD][IDXD_NVAL]
                     globl.power_l3 = DSMR_OBIS_LIST[DSMR_PWR_L3_CONS][IDXD_NVAL] - DSMR_OBIS_LIST[DSMR_PWR_L3_PROD][IDXD_NVAL]
-                    
-                    # calculate het voortschrijdend gemiddelde
-                    #int_pwr_cons[0-9] = ++ ... / 10 etc
+                    # Fill HOME_POWER array
+                    globl.HOME_POWER[globl.HOME_PWR_TIME_STAMP][globl.IDXH_HVAL] = DSMR_OBIS_LIST[DSMR_TIME_STAMP][IDXD_NVAL]
+                    globl.HOME_POWER[globl.HOME_PWR_CONS][globl.IDXH_HVAL] = DSMR_OBIS_LIST[DSMR_PWR_TOT_CONS][IDXD_NVAL]
+                    globl.HOME_POWER[globl.HOME_PWR_PROD][globl.IDXH_HVAL] = DSMR_OBIS_LIST[DSMR_PWR_TOT_PROD][IDXD_NVAL]
+                    globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL] = DSMR_OBIS_LIST[DSMR_PWR_TOT_CONS][IDXD_NVAL] - DSMR_OBIS_LIST[DSMR_PWR_TOT_PROD][IDXD_NVAL]
+                    globl.HOME_POWER[globl.HOME_PWR_L1][globl.IDXH_HVAL] = DSMR_OBIS_LIST[DSMR_PWR_L1_CONS][IDXD_NVAL] - DSMR_OBIS_LIST[DSMR_PWR_L1_PROD][IDXD_NVAL]
+                    globl.HOME_POWER[globl.HOME_PWR_L2][globl.IDXH_HVAL] = DSMR_OBIS_LIST[DSMR_PWR_L2_CONS][IDXD_NVAL] - DSMR_OBIS_LIST[DSMR_PWR_L2_PROD][IDXD_NVAL]                    
+                    globl.HOME_POWER[globl.HOME_PWR_L3][globl.IDXH_HVAL] = DSMR_OBIS_LIST[DSMR_PWR_L3_CONS][IDXD_NVAL] - DSMR_OBIS_LIST[DSMR_PWR_L3_PROD][IDXD_NVAL]
+
+                    # calculate moving average (voortschrijdend gemiddelde)
+                    win_2.append(globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL])
+                    win_3.append(globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL])
+                    win_4.append(globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL])
+                    win_5.append(globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL])
+                    win_6.append(globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL])
+                    win_8.append(globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL])
+
+                    # keep only last N values
+                    if len(win_2) > 2: win_2.pop(0)
+                    if len(win_3) > 3: win_3.pop(0)
+                    if len(win_4) > 4: win_4.pop(0)
+                    if len(win_5) > 5: win_5.pop(0)
+                    if len(win_6) > 6: win_6.pop(0)
+                    if len(win_8) > 8: win_8.pop(0)
+
+                    if globl.show_mov_avrg: 
+                        # device based on window size
+                        ma_2 = sum(win_2) / 2
+                        ma_3 = sum(win_3) / 3
+                        ma_4 = sum(win_4) / 4
+                        ma_5 = sum(win_5) / 5
+                        ma_6 = sum(win_6) / 6
+                        ma_8 = sum(win_8) / 8
+                        # print value and moving average with 0 decimals
+                        print(f"{globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL]:.0f}; {ma_2:.0f}; {ma_3:.0f}; {ma_4:.0f}; {ma_5:.0f}; {ma_6:.0f}; {ma_8:.0f}")
+
                     
         except Exception as e:
             globl.log_debug(module_name, f"Exception error: {e}")

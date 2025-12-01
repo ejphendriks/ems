@@ -139,7 +139,7 @@ class SimpleCLI:
         ems_stop_event.clear()
         
         # spawn threads
-        t1 = threading.Thread(target=batt_thread_fn, name="batt-thread", args=(batt_stop_event, 1.0), daemon=True)
+        t1 = threading.Thread(target=batt_thread_fn, name="batt-thread", args=(batt_stop_event, 2.0), daemon=True)
         t2 = threading.Thread(target=dsmr_thread_fn, name="dsmr-thread", args=(dsmr_stop_event, 1.0), daemon=True)
         t3 = threading.Thread(target=baseload_thread_fn, name="baseload-thread", args=(bsld_stop_event, 1.0), daemon=True)
         t4 = threading.Thread(target=logger_thread_fn, name="logger-thread", args=(log_stop_event, 1.0), daemon=True)
@@ -431,8 +431,20 @@ class SimpleCLI:
         print()
         print("[BATT] GR | NAME                     |                VALUE | UNIT | DESC .... ")
         print("[BATT] ---+--------------------------+----------------------+------+------------------")
-        # --- start index with 1 because of header row
-        for indx in range(1, len(globl.BATT_REGISTER_LIST)): # --- start with 1 becaue of the header
+
+        # --- Start index with +1 because of header row
+        for indx in range(globl.BATT_DEVICE_NAME, globl.BATT_BACKUP_PWR_VAL+1): # --- start with 1 becaue of the header
+            reg_name = globl.BATT_REGISTER_LIST[indx][globl.IDXB_NAME]
+            reg_abbr = globl.BATT_REGISTER_LIST[indx][globl.IDXB_ABBR]
+            reg_conv = globl.BATT_REGISTER_LIST[indx][globl.IDXB_CONV]
+            reg_unit = globl.BATT_REGISTER_LIST[indx][globl.IDXB_UNIT]
+            reg_desc = globl.BATT_REGISTER_LIST[indx][globl.IDXB_DESC]
+            if isinstance(reg_conv, float):
+                print(f"[BATT] {reg_abbr} | {reg_name:<24} | {reg_conv:>20.2f} | {reg_unit:<4} | {reg_desc}")
+            else:
+                print(f"[BATT] {reg_abbr} | {reg_name:<24} | {reg_conv:>20} | {reg_unit:<4} | {reg_desc}")
+        # --- SKIP STATS : BATT_TOT_CHARGED .. BATT_MNT_DISCHARGED
+        for indx in range(globl.BATT_INT_TEMP, globl.BATT_MAX_DISCHARGE_PWR+1): # --- start with 1 becaue of the header
             reg_name = globl.BATT_REGISTER_LIST[indx][globl.IDXB_NAME]
             reg_abbr = globl.BATT_REGISTER_LIST[indx][globl.IDXB_ABBR]
             reg_conv = globl.BATT_REGISTER_LIST[indx][globl.IDXB_CONV]
@@ -515,6 +527,9 @@ class SimpleCLI:
         elif argument.strip() == "debug":
             globl.log_debug(module_name, "Toggle DEBUG data...")
             globl.show_debug = not globl.show_debug
+        elif argument.strip() == "ma":
+            globl.log_debug(module_name, "Toggle Moving Average data...")
+            globl.show_mov_avrg = not globl.show_mov_avrg
         else:
             print(f"unknown toggle argument: (type 'help')")
             print("  toggle mrst")
@@ -524,15 +539,24 @@ class SimpleCLI:
             #print("  toggle ems")
             print("  toggle debug")
 
+    # ----------------------------------------------------------------------------
+
     def mode(self, argument):
         if argument.strip() == "manual":
             globl.log_debug(module_name, "Mode set to manual...")
             globl.mode_baseload = False
             globl.mode_manual = True
+            globl.mode_stop = False
         elif argument.strip() == "baseload":
             globl.log_debug(module_name, "Mode set to baseload...")
             globl.mode_manual = False
             globl.mode_baseload = True
+            globl.mode_stop = False
+        elif argument.strip() == "stop":
+            globl.log_debug(module_name, "Stop running program set to baseload...")
+            globl.mode_manual = False
+            globl.mode_baseload = False
+            globl.mode_stop = True
         else:
             print(f"unknown mode argument: (type 'help')")
             print("  mode manual")

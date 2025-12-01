@@ -32,17 +32,20 @@ show_mrst = False
 show_bsld = False
 show_loop = False
 show_debug = True
+show_mov_avrg = False
 
+mode_changed = False        # --- Single trigger
 mode_baseload = False
-mode_manual = True
-mode_changed = False
+mode_manual = False
+mode_stop = False
 
 set_pwr_charge = 680
 set_pwr_discharge = 450
 set_inv_state = INV_STATE_STOP
 
-batt_restart = False
 batt_rtu = False
+batt_restart = False
+batt_stop = False
 
 
 # -----------------------------------------------------------------------------
@@ -173,7 +176,7 @@ BATT_REGISTER_LIST = [
 [27,"BATT_MOS2_TEMP","TP",cvalue,"°C",""],
 [28,"BATT_MAX_CELL_TEMP","CT",cvalue,"°C",""],
 [29,"BATT_MIN_CELL_TEMP","CT",cvalue,"°C",""],
-[30,"BATT_GET_INV_STATE","GI",cvalue," ","0:sleep, 1:standby, 2:charging, 3:discharging, 4:backup, 5:upgrade"],
+[30,"BATT_GET_INV_STATE","GI",cvalue," ","0:slp,1:stby,2:chrg,3:dis,4:bkup,5:upgr"],
 [31,"BATT_LIMIT_VOLT","LT",cvalue,"mv",""],
 [32,"BATT_LIMIT_CHARGE_CURR","LT",cvalue,"ma",""],
 [33,"BATT_LIMIT_DISCHARG_CURR","LT",cvalue,"ma",""],

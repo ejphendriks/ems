@@ -216,19 +216,19 @@ def copy_marstek_to_batt():
     #--- Copy BATT_TOT_CHARGED -- Because these registers consist of 2 words...
     #globl.BATT_REGISTER_LIST[globl.BATT_TOT_CHARGED][globl.IDXB_CONV] = (MARSTEK_MODBUS[MRST_TOT_CHARGED_H][IDXM_CONV] + MARSTEK_MODBUS[MRST_TOT_CHARGED_L][IDXM_CONV]) * MARSTEK_MODBUS[MRST_TOT_CHARGED_L][IDXM_GAIN]
     #globl.BATT_REGISTER_LIST[globl.BATT_TOT_DISCHARGED][globl.IDXB_CONV] = (MARSTEK_MODBUS[MRST_TOT_DISCHARGED_H][IDXM_CONV] + MARSTEK_MODBUS[MRST_TOT_DISCHARGED_L][IDXM_CONV]) * MARSTEK_MODBUS[MRST_TOT_DISCHARGED_L][IDXM_GAIN]
-    globl.BATT_REGISTER_LIST[globl.BATT_TOT_CHARGED][globl.IDXB_CONV] = "n.a."
-    globl.BATT_REGISTER_LIST[globl.BATT_TOT_DISCHARGED][globl.IDXB_CONV] = "n.a."
-    globl.BATT_REGISTER_LIST[globl.BATT_DAY_CHARGED][globl.IDXB_CONV] = "n.a."
-    globl.BATT_REGISTER_LIST[globl.BATT_DAY_DISCHARGED][globl.IDXB_CONV] = "n.a."
-    globl.BATT_REGISTER_LIST[globl.BATT_MNT_CHARGED][globl.IDXB_CONV] = "n.a."
-    globl.BATT_REGISTER_LIST[globl.BATT_MNT_DISCHARGED][globl.IDXB_CONV] = "n.a."
+    #globl.BATT_REGISTER_LIST[globl.BATT_TOT_CHARGED][globl.IDXB_CONV] = "n.a."
+    #globl.BATT_REGISTER_LIST[globl.BATT_TOT_DISCHARGED][globl.IDXB_CONV] = "n.a."
+    #globl.BATT_REGISTER_LIST[globl.BATT_DAY_CHARGED][globl.IDXB_CONV] = "n.a."
+    #globl.BATT_REGISTER_LIST[globl.BATT_DAY_DISCHARGED][globl.IDXB_CONV] = "n.a."
+    #globl.BATT_REGISTER_LIST[globl.BATT_MNT_CHARGED][globl.IDXB_CONV] = "n.a."
+    #globl.BATT_REGISTER_LIST[globl.BATT_MNT_DISCHARGED][globl.IDXB_CONV] = "n.a."
     
     # Now copy all remaining registers until the end of the list
     for idxm in range(MRST_INT_TEMP, MRST_MAX_DISCHARGE_PWR + 1):
         #--- Copy regs incl offset BATT REG (24) vs MARST_MODBUS (49) (49-24=25)
         offset = MRST_INT_TEMP - globl.BATT_INT_TEMP
         globl.BATT_REGISTER_LIST[idxm-offset][globl.IDXB_CONV] = MARSTEK_MODBUS[idxm][IDXM_CONV]
-
+    
 # -----------------------------------------------------------------------------------------
 # --- Convert all modbus register values in the MARSTEK_MODBUS list object CON_VALUE ------
 # -----------------------------------------------------------------------------------------
@@ -336,6 +336,11 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
         stopbits=1,
         timeout=1
     )
+    # --- proportional controller
+    new_setpoint = 0        # --- new setpoint
+    mrst_delta = 0          # delta between mrst set and measured power    
+
+    
 
     while not batt_stop_event.is_set():
         
@@ -510,42 +515,61 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
                 else: # copy modbus registers in MARSTEK_MODBUS list object
                     copy_modbus_register_block(result, reg_block)
                             
+                # --- Convert all MODBUS registers and adjust gain
+                convert_modbus_registers()
+
+                # --- Copy MARSTEK MODBUS LIST to BATT_REGISTER_LIST with Thread.Lock
+                copy_marstek_to_batt()
+
+                # --- SET MODUS / PROGRAM ------------------------------------------------------------------                            
+                
+                # --- MODE BASELOAD --------------------------------------
                 if globl.mode_baseload:
-                    # ToDo: Implement PID controller that follows the DSMR
+                    # --- Check if already in RTU mode    
+                    if MARSTEK_MODBUS[MRST_RTU_MODE][IDXM_CONV] != 0x55AA: 
+                        # --- Set value for MRST_RTU_MODE = 0x55AA (21930d)
+                        result = client.write_register(address=MARSTEK_MODBUS[MRST_RTU_MODE][IDXM_ADDR], value=0x55AA, device_id=unit_id)
+                        if result.isError():
+                            globl.log_debug(module_name, f"Write error: {result}")
+                     # --- Check if already in discharge mode : MRST_SET_INV_STATE is NOT set to discharge then...
+                    inverter_state = 2  # --- discharge
+                    if MARSTEK_MODBUS[MRST_SET_INV_STATE][IDXM_ADDR] != inverter_state: # --- Check if already in RTU mode
+                        # --- Set MRST_SET_INV_STATE to discharge
+                        result = client.write_register(address=MARSTEK_MODBUS[MRST_SET_INV_STATE][IDXM_ADDR], value=inverter_state, device_id=unit_id)
+                        if result.isError():
+                            globl.log_debug(module_name, f"Write error: {result}")
+
+                    # ToDo: Implement BATT controller that follows the DSMR
+                    home_power = globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL]  # --- POS means power consumption (NEG = production)
+                    mrst_measured_power = MARSTEK_MODBUS[MRST_AC_PWR_VAL][IDXM_CONV]  # --- POS is discharging (NEG = charging)
+                    mrst_setpoint_discharge_power = MARSTEK_MODBUS[MRST_PWR_DISCHARGE][IDXM_CONV]  # --- Setpoint discharge power
                     
-                    if globl.mode_changed:
-                        # Reset the changed flag
-                        globl.mode_changed = False
-                        # --- ToDo: Check all the values
-                        print(f"HOME_POWER[HOME_PWR_TIME_STAMP] = {globl.HOME_POWER[globl.HOME_PWR_TIME_STAMP][globl.IDXH_HVAL]}")
-                        print(f"HOME_PWR_TOT = {globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL]}")
-                        print(f"HOME_PWR_L1 = {globl.HOME_POWER[globl.HOME_PWR_L1][globl.IDXH_HVAL]}")
-                        print(f"HOME_PWR_L2 = {globl.HOME_POWER[globl.HOME_PWR_L2][globl.IDXH_HVAL]}")
-                        print(f"HOME_PWR_L3 = {globl.HOME_POWER[globl.HOME_PWR_L3][globl.IDXH_HVAL]}")
-                        # --- ToDo: Implement PID controller that follows the DSMR
-                        home_tot_power = globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL]
-                        home_offset_power = 0 # --- This needs to be the Marstek set signed value 
-                        # --- ToDo: More implement PID EJPH XXX
-                        # --- Write the changes via MODBUS to the Marstek
-                        if MARSTEK_MODBUS[MRST_RTU_MODE][IDXM_CONV] != 0x55AA: # --- Check if already in RTU mode
-                            # --- Set value for MRST_RTU_MODE = 0x55AA (21930d)
-                            result = client.write_register(address=MARSTEK_MODBUS[MRST_RTU_MODE][IDXM_ADDR], value=0x55AA, device_id=unit_id)
-                            if result.isError():
-                                globl.log_debug(module_name, f"Write error: {result}")
-                        # --- Set value for MRST_PWR_CHARGE
-                        result = client.write_register(address=MARSTEK_MODBUS[MRST_PWR_CHARGE][IDXM_ADDR], value=globl.set_pwr_charge, device_id=unit_id)
-                        if result.isError():
-                            globl.log_debug(module_name, f"Write error: {result}")
-                        # --- Set value for MRST_PWR_DISCHARGE
-                        result = client.write_register(address=MARSTEK_MODBUS[MRST_PWR_DISCHARGE][IDXM_ADDR], value=globl.set_pwr_discharge, device_id=unit_id)
-                        if result.isError():
-                            globl.log_debug(module_name, f"Write error: {result}")
-                        # --- Set value for MRST_SET_INV_STATE
-                        result = client.write_register(address=MARSTEK_MODBUS[MRST_SET_INV_STATE][IDXM_ADDR], value=globl.set_inv_state, device_id=unit_id)
-                        if result.isError():
-                            globl.log_debug(module_name, f"Write error: {result}")
+                    # --- Calculate the delta using proporional value only
+                    mrst_delta = mrst_setpoint_discharge_power - mrst_measured_power # -- POS means ramping up and NEG means ramping down
+                    print(f"HOME POWER:{home_power}; mrst_delta:{mrst_delta}; mrst_setpoint:{mrst_setpoint_discharge_power}; mrst_measured:{mrst_measured_power}")
+                    new_setpoint = mrst_setpoint_discharge_power + (home_power - mrst_delta)
+                    
+                    #if home_power > 0:  # --- Home is consuming energy
+                    #    new_setpoint = mrst_setpoint_discharge_power + (home_power - mrst_delta)
+                    #elif home_power < 0:  # --- Home is producing energy
+                    #    new_setpoint = mrst_setpoint_discharge_power + (home_power - mrst_delta)
+                    
+                    # --- Set value for MRST_PWR_DISCHARGE
+                    result = client.write_register(address=MARSTEK_MODBUS[MRST_PWR_DISCHARGE][IDXM_ADDR], value=int(new_setpoint), device_id=unit_id)
+                    if result.isError():
+                       globl.log_debug(module_name, f"Write error: {result}")
+                       
+                    # if globl.mode_changed:
+                        # # Reset the changed flag
+                        # globl.mode_changed = False
+                        # # --- ToDo: Check all the values
+                        # print(f"HOME_POWER[HOME_PWR_TIME_STAMP] = {globl.HOME_POWER[globl.HOME_PWR_TIME_STAMP][globl.IDXH_HVAL]}")
+                        # print(f"HOME_PWR_TOT = {globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL]}")
+                        # print(f"HOME_PWR_L1 = {globl.HOME_POWER[globl.HOME_PWR_L1][globl.IDXH_HVAL]}")
+                        # print(f"HOME_PWR_L2 = {globl.HOME_POWER[globl.HOME_PWR_L2][globl.IDXH_HVAL]}")
+                        # print(f"HOME_PWR_L3 = {globl.HOME_POWER[globl.HOME_PWR_L3][globl.IDXH_HVAL]}")
 
-
+                # --- MODE MANUAL --------------------------------------
                 if globl.mode_manual:
                     if globl.mode_changed:
                         # Reset the changed flag
@@ -569,7 +593,23 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
                         if result.isError():
                             globl.log_debug(module_name, f"Write error: {result}")
                     
-                    
+                # --- Stop the running programm -------------------------------
+                if globl.mode_stop:
+                    # Reset the stop flag
+                    globl.mode_stop = False
+                    print("[BATT] Stopping running program ...")
+                    # --- Check if already in RTU mode
+                    if MARSTEK_MODBUS[MRST_RTU_MODE][IDXM_CONV] != 0x55AA:
+                        # --- Set value for MRST_RTU_MODE = 0x55AA (21930d)
+                        result = client.write_register(address=MARSTEK_MODBUS[MRST_RTU_MODE][IDXM_ADDR], value=0x55AA, device_id=unit_id)
+                        if result.isError():
+                            globl.log_debug(module_name, f"Write error: {result}")
+                    # --- Set STOP value in MRST_SET_INV_STATE
+                    result = client.write_register(address=MARSTEK_MODBUS[MRST_SET_INV_STATE][IDXM_ADDR], value=0, device_id=unit_id) # --- 0: STOP
+                    if result.isError():
+                        globl.log_debug(module_name, f"Write error: {result}")
+                    print("[BATT] Stopped running program ...")
+
                 # --- Restart marstek
                 if globl.batt_restart:
                     print("[BATT] Restarting Marstek Venus E V2.0 ...")
@@ -579,23 +619,17 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
                         globl.log_debug(module_name, f"Write error: {result}")
                     else:
                         globl.log_debug(module_name, f"Write succes: {result}")
-                            
-                # --- Convert all MODBUS registers and adjust gain
-                convert_modbus_registers()
 
-                # --- Copy MARSTEK MODBUS LIST to BATT_REGISTER_LIST with Thread.Lock
-                copy_marstek_to_batt()
-                
                 # --- Print all MODBUS registers
                 print_modbus_registers()
 
                 cntr += 1      # increment counter
-                time.sleep(2)  # delay between reads (interval)
+                time.sleep(interval)  # delay between reads (interval)
                 globl.log_loop(module_name, f"Loop counter: {cntr}")
                 
         except Exception as e:
             globl.log_debug(module_name, f"Exception: {e}")
-            time.sleep(2)  # delay between reads after error
+            time.sleep(interval)  # delay between reads after error
         finally:
             client.close()
             globl.log_debug(module_name, "Battery connection closed.")
