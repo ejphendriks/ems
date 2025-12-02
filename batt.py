@@ -9,6 +9,32 @@ batt.py
     The DSMR and MODBUS data should be shared as global data
 """
 
+
+# --- mode nom 
+# ---   running the Nul Op de Meter program
+        
+# --- mode baseload 
+# ---   running the baseload program
+# ---   load file for instructions per (1/4) hour
+# ---              incl instructions to load until 80% full
+
+# --- mode manual (allowing direct commands)
+# ---   supporting the follwing commands: 
+# ---       restart, reset  --> man_reset = True (will be set to False after execution in batt.py)
+# ---       backup          --> man_backup <on/off>
+# ---       rtu             --> man_rtu <on/off>
+# ---       inv             --> man_inv <stop(0), chrg(1), dsch(2)>
+# ---       tsoc            --> man_tsoc <12..100%> 
+# ---       chrg            --> man_chrg <0..2500W>
+# ---       dsch            --> man_dsch <0..2500W>
+# ---       ccoff           --> man_ccoff <80%..100%>
+# ---       dcoff           --> man_dcoff <12%..30%>
+# ---       maxcpwr         --> man_maxcpwr <0..2500W>
+# ---       maxdpwr         --> man_maxdpwr <0..2500W>
+# ---       help
+# ---       ?
+
+
 import threading
 import binascii
 import socket
@@ -91,84 +117,85 @@ MRST_MAX_DISCHARGE_PWR = 73 #  44003 1 u16 1W
 # --- MARSTEK MODBUS REGISTERS --- Marstek Venus E V20 ------------------------ 
 # -----------------------------------------------------------------
 
-raw_value = 0
+r_value = 0
+w_value = 0
 con_value = 0
 
 MARSTEK_MODBUS = [
-["INDX","NAME","ADDR","ABBR","BLCK","OFFSET","MODE","TYPE","RAWV","GAIN","CONV","UNIT","DESC"],
-[1,"MRST_DEVICE_NAME",31000,"DN",10,0,"R","c",raw_value,1,con_value," ",""],
-[2,"MRST_DEVICE_NAME",31001,"DN",0,1,"R","c",raw_value,1,con_value," ",""],
-[3,"MRST_DEVICE_NAME",31002,"DN",0,2,"R","c",raw_value,1,con_value," ",""],
-[4,"MRST_DEVICE_NAME",31003,"DN",0,3,"R","c",raw_value,1,con_value," ",""],
-[5,"MRST_DEVICE_NAME",31004,"DN",0,4,"R","c",raw_value,1,con_value," ",""],
-[6,"MRST_DEVICE_NAME",31005,"DN",0,5,"R","c",raw_value,1,con_value," ",""],
-[7,"MRST_DEVICE_NAME",31006,"DN",0,6,"R","c",raw_value,1,con_value," ",""],
-[8,"MRST_DEVICE_NAME",31007,"DN",0,7,"R","c",raw_value,1,con_value," ",""],
-[9,"MRST_DEVICE_NAME",31008,"DN",0,8,"R","c",raw_value,1,con_value," ",""],
-[10,"MRST_DEVICE_NAME",31009,"DN",0,9,"R","c",raw_value,1,con_value," ",""],
-[11,"MRST_FW_VERSION",31100,"FW",1,0,"R","u",raw_value,0.01,con_value," ",""],
-[12,"MRST_SERIAL_NUM",31200,"SN",10,0,"R","c",raw_value,1,con_value," ",""],
-[13,"MRST_SERIAL_NUM",31201,"SN",0,1,"R","c",raw_value,1,con_value," ",""],
-[14,"MRST_SERIAL_NUM",31202,"SN",0,2,"R","c",raw_value,1,con_value," ",""],
-[15,"MRST_SERIAL_NUM",31203,"SN",0,3,"R","c",raw_value,1,con_value," ",""],
-[16,"MRST_SERIAL_NUM",31204,"SN",0,4,"R","c",raw_value,1,con_value," ",""],
-[17,"MRST_SERIAL_NUM",31205,"SN",0,5,"R","c",raw_value,1,con_value," ",""],
-[18,"MRST_SERIAL_NUM",31206,"SN",0,6,"R","c",raw_value,1,con_value," ",""],
-[19,"MRST_SERIAL_NUM",31207,"SN",0,7,"R","c",raw_value,1,con_value," ",""],
-[20,"MRST_SERIAL_NUM",31208,"SN",0,8,"R","c",raw_value,1,con_value," ",""],
-[21,"MRST_SERIAL_NUM",31209,"SN",0,9,"R","c",raw_value,1,con_value," ",""],
-[22,"MRST_DC_VOLT",32100,"DC",6,0,"R","u",raw_value,0.01,con_value,"V",""],
-[23,"MRST_DC_CURR",32101,"DC",0,1,"R","s",raw_value,0.01,con_value,"A",""],
-[24,"MRST_DC_PWR_DIR",32102,"DC",0,2,"R","s",raw_value,1,con_value,"-->","pos is charge"],
-[25,"MRST_DC_PWR_VAL",32103,"DC",0,3,"R","s",raw_value,1,con_value,"W","pos is charge"],
-[26,"MRST_DC_SOC",32104,"DC",0,4,"R","u",raw_value,1,con_value,"%",""],
-[27,"MRST_DC_TOT_ENRG",32105,"DC",0,5,"R","u",raw_value,0.01,con_value,"kWh",""],
-[28,"MRST_AC_VOLT",32200,"AC",5,0,"R","u",raw_value,0.1,con_value,"V",""],
-[29,"MRST_AC_CURR",32201,"AC",0,1,"R","u",raw_value,0.01,con_value,"A",""],
-[30,"MRST_AC_PWR_DIR",32202,"AC",0,2,"R","s",raw_value,1,con_value,"-->","pos is discharge"],
-[31,"MRST_AC_PWR_VAL",32203,"AC",0,3,"R","s",raw_value,1,con_value,"W","pos is discharge"],
-[32,"MRST_AC_FREQ",32204,"AC",0,4,"R","u",raw_value,0.01,con_value,"Hz",""],
-[33,"MRST_BACKUP_VOLT",32300,"BU",4,0,"R","u",raw_value,0.1,con_value,"V",""],
-[34,"MRST_BACKUP_CURR",32301,"BU",0,1,"R","u",raw_value,0.01,con_value,"A",""],
-[35,"MRST_BACKUP_PWR_DIR",32302,"BU",0,2,"R","s",raw_value,1,con_value,"W","pos is discharge"],
-[36,"MRST_BACKUP_PWR_VAL",32303,"BU",0,3,"R","s",raw_value,1,con_value,"W","pos is discharge"],
-[37,"MRST_TOT_CHARGED_H",33000,"ST",12,0,"R","u",raw_value,0.01,con_value,"kWh",""],
-[38,"MRST_TOT_CHARGED_L",33001,"ST",0,1,"R","u",raw_value,0.01,con_value,"kWh",""],
-[39,"MRST_TOT_DISCHARGED_H",33002,"ST",0,2,"R","u",raw_value,0.01,con_value,"kWh",""],
-[40,"MRST_TOT_DISCHARGED_L",33003,"ST",0,3,"R","u",raw_value,0.01,con_value,"kWh",""],
-[41,"MRST_DAY_CHARGED_H",33004,"ST",0,4,"R","u",raw_value,0.01,con_value,"kWh",""],
-[42,"MRST_DAY_CHARGED_L",33005,"ST",0,5,"R","u",raw_value,0.01,con_value,"kWh",""],
-[43,"MRST_DAY_DISCHARGED_H",33006,"ST",0,6,"R","u",raw_value,0.01,con_value,"kWh",""],
-[44,"MRST_DAY_DISCHARGED_L",33007,"ST",0,7,"R","u",raw_value,0.01,con_value,"kWh",""],
-[45,"MRST_MNT_CHARGED_H",33008,"ST",0,8,"R","u",raw_value,0.01,con_value,"kWh",""],
-[46,"MRST_MNT_CHARGED_L",33009,"ST",0,9,"R","u",raw_value,0.01,con_value,"kWh",""],
-[47,"MRST_MNT_DISCHARGED_H",33010,"ST",0,10,"R","u",raw_value,0.01,con_value,"kWh",""],
-[48,"MRST_MNT_DISCHARGED_L",33011,"ST",0,11,"R","u",raw_value,0.01,con_value,"kWh",""],
-[49,"MRST_INT_TEMP",35000,"TP",3,0,"R","u",raw_value,0.1,con_value,"°C",""],
-[50,"MRST_MOS1_TEMP",35001,"TP",0,1,"R","u",raw_value,0.1,con_value,"°C",""],
-[51,"MRST_MOS2_TEMP",35002,"TP",0,2,"R","u",raw_value,0.1,con_value,"°C",""],
-[52,"MRST_MAX_CELL_TEMP",35010,"CT",2,0,"R","u",raw_value,0.1,con_value,"°C",""],
-[53,"MRST_MIN_CELL_TEMP",35011,"CT",0,1,"R","u",raw_value,0.1,con_value,"°C",""],
-[54,"MRST_GET_INV_STATE",35100,"GI",1,0,"R","u",raw_value,1,con_value," ","State[0,1,2:chrg,3:disch,4,5]"],
-[55,"MRST_LIMIT_VOLT",35110,"LT",3,0,"R","u",raw_value,100,con_value,"mv",""],
-[56,"MRST_LIMIT_CHARGE_CURR",35111,"LT",0,1,"R","u",raw_value,100,con_value,"ma",""],
-[57,"MRST_LIMIT_DISCHARG_CURR",35112,"LT",0,2,"R","u",raw_value,100,con_value,"ma",""],
-[58,"MRST_ALARM",36000,"AL",1,0,"R","b",raw_value,1,con_value," ","Alarm register"],
-[59,"MRST_FAULT_LSB",36100,"FT",2,0,"R","b",raw_value,1,con_value," ","Fault register LSB"],
-[60,"MRST_FAULT_MSB",36101,"FT",0,1,"R","b",raw_value,1,con_value," ","Fault register MSB"],
-[61,"MRST_RESTART",41000,"RS",1,0,"RW","u",raw_value,1,con_value," ","0x55AA-->restart"],
-[62,"MRST_UNIT_ID",41100,"UI",1,0,"RW","u",raw_value,1,con_value," ","unit id [1..255]"],
-[63,"MRST_BACKUP",41200,"BK",1,0,"RW","u",raw_value,1,con_value," ","0:enable,1:disbale"],
-[64,"MRST_RTU_MODE",42000,"RM",1,0,"RW","u",raw_value,1,con_value," ","0x55AA=ON, 0x55BB=OFF"],
-[65,"MRST_SET_INV_STATE",42010,"SI",2,0,"RW","u",raw_value,1,con_value," ","0:stop, 1:charge, 2:discharge"],
-[66,"MRST_CHARGE_TO_SOC",42011,"SI",0,1,"RW","u",raw_value,1,con_value,"%","charge to target SOC"],
-[67,"MRST_PWR_CHARGE",42020,"PW",2,0,"RW","u",raw_value,1,con_value,"W","range:[0..2500W]"],
-[68,"MRST_PWR_DISCHARGE",42021,"PW",0,1,"RW","u",raw_value,1,con_value,"W","range:[0..2500W]"],
-[69,"MRST_USER_MODE",43000,"UM",1,0,"RW","u",raw_value,1,con_value," ","0:manual,1:anti-feed,2:trade_mode"],
-[70,"MRST_CHARGE_CUTOFF",44000,"CO",4,0,"RW","u",raw_value,0.1,con_value,"%","range:[80%..100%]"],
-[71,"MRST_DISCHARGE_CUTOFF",44001,"CO",0,1,"RW","u",raw_value,0.1,con_value,"%","range:[12%..30%]"],
-[72,"MRST_MAX_CHARGE_PWR",44002,"CO",0,2,"RW","u",raw_value,1,con_value,"W","range:[0..2500W]"],
-[73,"MRST_MAX_DISCHARGE_PWR",44003,"CO",0,3,"RW","u",raw_value,1,con_value,"W","range:[0..2500W]"]
+["INDX","NAME","ADDR","ABBR","BLCK","OFFSET","MODE","TYPE","RVAL","WVAL","GAIN","CONV","UNIT","DESC"],
+[1,"MRST_DEVICE_NAME",31000,"DN",10,0,"R","c",r_value,w_value,1,con_value," ",""],
+[2,"MRST_DEVICE_NAME",31001,"DN",0,1,"R","c",r_value,w_value,1,con_value," ",""],
+[3,"MRST_DEVICE_NAME",31002,"DN",0,2,"R","c",r_value,w_value,1,con_value," ",""],
+[4,"MRST_DEVICE_NAME",31003,"DN",0,3,"R","c",r_value,w_value,1,con_value," ",""],
+[5,"MRST_DEVICE_NAME",31004,"DN",0,4,"R","c",r_value,w_value,1,con_value," ",""],
+[6,"MRST_DEVICE_NAME",31005,"DN",0,5,"R","c",r_value,w_value,1,con_value," ",""],
+[7,"MRST_DEVICE_NAME",31006,"DN",0,6,"R","c",r_value,w_value,1,con_value," ",""],
+[8,"MRST_DEVICE_NAME",31007,"DN",0,7,"R","c",r_value,w_value,1,con_value," ",""],
+[9,"MRST_DEVICE_NAME",31008,"DN",0,8,"R","c",r_value,w_value,1,con_value," ",""],
+[10,"MRST_DEVICE_NAME",31009,"DN",0,9,"R","c",r_value,w_value,1,con_value," ",""],
+[11,"MRST_FW_VERSION",31100,"FW",1,0,"R","u",r_value,w_value,0.01,con_value," ",""],
+[12,"MRST_SERIAL_NUM",31200,"SN",10,0,"R","c",r_value,w_value,1,con_value," ",""],
+[13,"MRST_SERIAL_NUM",31201,"SN",0,1,"R","c",r_value,w_value,1,con_value," ",""],
+[14,"MRST_SERIAL_NUM",31202,"SN",0,2,"R","c",r_value,w_value,1,con_value," ",""],
+[15,"MRST_SERIAL_NUM",31203,"SN",0,3,"R","c",r_value,w_value,1,con_value," ",""],
+[16,"MRST_SERIAL_NUM",31204,"SN",0,4,"R","c",r_value,w_value,1,con_value," ",""],
+[17,"MRST_SERIAL_NUM",31205,"SN",0,5,"R","c",r_value,w_value,1,con_value," ",""],
+[18,"MRST_SERIAL_NUM",31206,"SN",0,6,"R","c",r_value,w_value,1,con_value," ",""],
+[19,"MRST_SERIAL_NUM",31207,"SN",0,7,"R","c",r_value,w_value,1,con_value," ",""],
+[20,"MRST_SERIAL_NUM",31208,"SN",0,8,"R","c",r_value,w_value,1,con_value," ",""],
+[21,"MRST_SERIAL_NUM",31209,"SN",0,9,"R","c",r_value,w_value,1,con_value," ",""],
+[22,"MRST_DC_VOLT",32100,"DC",6,0,"R","u",r_value,w_value,0.01,con_value,"V",""],
+[23,"MRST_DC_CURR",32101,"DC",0,1,"R","s",r_value,w_value,0.01,con_value,"A",""],
+[24,"MRST_DC_PWR_DIR",32102,"DC",0,2,"R","s",r_value,w_value,1,con_value,"W","pos is charge"],
+[25,"MRST_DC_PWR_VAL",32103,"DC",0,3,"R","s",r_value,w_value,1,con_value,"W","pos is charge"],
+[26,"MRST_DC_SOC",32104,"DC",0,4,"R","u",r_value,w_value,1,con_value,"%",""],
+[27,"MRST_DC_TOT_ENRG",32105,"DC",0,5,"R","u",r_value,w_value,0.01,con_value,"kWh",""],
+[28,"MRST_AC_VOLT",32200,"AC",5,0,"R","u",r_value,w_value,0.1,con_value,"V",""],
+[29,"MRST_AC_CURR",32201,"AC",0,1,"R","u",r_value,w_value,0.01,con_value,"A",""],
+[30,"MRST_AC_PWR_DIR",32202,"AC",0,2,"R","s",r_value,w_value,1,con_value,"W","pos is discharge"],
+[31,"MRST_AC_PWR_VAL",32203,"AC",0,3,"R","s",r_value,w_value,1,con_value,"W","pos is discharge"],
+[32,"MRST_AC_FREQ",32204,"AC",0,4,"R","u",r_value,w_value,0.01,con_value,"Hz",""],
+[33,"MRST_BACKUP_VOLT",32300,"BU",4,0,"R","u",r_value,w_value,0.1,con_value,"V",""],
+[34,"MRST_BACKUP_CURR",32301,"BU",0,1,"R","u",r_value,w_value,0.01,con_value,"A",""],
+[35,"MRST_BACKUP_PWR_DIR",32302,"BU",0,2,"R","s",r_value,w_value,1,con_value,"W","pos is discharge"],
+[36,"MRST_BACKUP_PWR_VAL",32303,"BU",0,3,"R","s",r_value,w_value,1,con_value,"W","pos is discharge"],
+[37,"MRST_TOT_CHARGED_H",33000,"ST",12,0,"R","u",r_value,w_value,0.01,con_value,"kWh",""],
+[38,"MRST_TOT_CHARGED_L",33001,"ST",0,1,"R","u",r_value,w_value,0.01,con_value,"kWh",""],
+[39,"MRST_TOT_DISCHARGED_H",33002,"ST",0,2,"R","u",r_value,w_value,0.01,con_value,"kWh",""],
+[40,"MRST_TOT_DISCHARGED_L",33003,"ST",0,3,"R","u",r_value,w_value,0.01,con_value,"kWh",""],
+[41,"MRST_DAY_CHARGED_H",33004,"ST",0,4,"R","u",r_value,w_value,0.01,con_value,"kWh",""],
+[42,"MRST_DAY_CHARGED_L",33005,"ST",0,5,"R","u",r_value,w_value,0.01,con_value,"kWh",""],
+[43,"MRST_DAY_DISCHARGED_H",33006,"ST",0,6,"R","u",r_value,w_value,0.01,con_value,"kWh",""],
+[44,"MRST_DAY_DISCHARGED_L",33007,"ST",0,7,"R","u",r_value,w_value,0.01,con_value,"kWh",""],
+[45,"MRST_MNT_CHARGED_H",33008,"ST",0,8,"R","u",r_value,w_value,0.01,con_value,"kWh",""],
+[46,"MRST_MNT_CHARGED_L",33009,"ST",0,9,"R","u",r_value,w_value,0.01,con_value,"kWh",""],
+[47,"MRST_MNT_DISCHARGED_H",33010,"ST",0,10,"R","u",r_value,w_value,0.01,con_value,"kWh",""],
+[48,"MRST_MNT_DISCHARGED_L",33011,"ST",0,11,"R","u",r_value,w_value,0.01,con_value,"kWh",""],
+[49,"MRST_INT_TEMP",35000,"TP",3,0,"R","u",r_value,w_value,0.1,con_value,"°C",""],
+[50,"MRST_MOS1_TEMP",35001,"TP",0,1,"R","u",r_value,w_value,0.1,con_value,"°C",""],
+[51,"MRST_MOS2_TEMP",35002,"TP",0,2,"R","u",r_value,w_value,0.1,con_value,"°C",""],
+[52,"MRST_MAX_CELL_TEMP",35010,"CT",2,0,"R","u",r_value,w_value,0.1,con_value,"°C",""],
+[53,"MRST_MIN_CELL_TEMP",35011,"CT",0,1,"R","u",r_value,w_value,0.1,con_value,"°C",""],
+[54,"MRST_GET_INV_STATE",35100,"IS",1,0,"R","u",r_value,w_value,1,con_value," ","0:slp,1:stby,2:chrg,3:disc,4:bkp,5"],
+[55,"MRST_LIMIT_VOLT",35110,"LT",3,0,"R","u",r_value,w_value,100,con_value,"mv",""],
+[56,"MRST_LIMIT_CHARGE_CURR",35111,"LT",0,1,"R","u",r_value,w_value,100,con_value,"ma",""],
+[57,"MRST_LIMIT_DISCHARG_CURR",35112,"LT",0,2,"R","u",r_value,w_value,100,con_value,"ma",""],
+[58,"MRST_ALARM",36000,"AL",1,0,"R","b",r_value,w_value,1,con_value," ","Alarm register"],
+[59,"MRST_FAULT_LSB",36100,"FT",2,0,"R","b",r_value,w_value,1,con_value," ","Fault double register"],
+[60,"MRST_FAULT_MSB",36101,"FT",0,1,"R","b",r_value,w_value,1,con_value," ","Fault double register"],
+[61,"MRST_RESTART",41000,"RS",1,0,"RW","u",r_value,w_value,1,con_value," ","0x55AA-->restart"],
+[62,"MRST_UNIT_ID",41100,"UI",1,0,"RW","u",r_value,w_value,1,con_value," ","unit id [1..255]"],
+[63,"MRST_BACKUP",41200,"BK",1,0,"RW","u",r_value,w_value,1,con_value," ","0:enable, 1:disbale"],
+[64,"MRST_RTU_MODE",42000,"RM",1,0,"RW","u",r_value,w_value,1,con_value," ","ON:0x55AA, OFF: 0x55BB"],
+[65,"MRST_SET_INV_STATE",42010,"IV",2,0,"RW","u",r_value,w_value,1,con_value," ","0:stop,1:charge,2:discharge"],
+[66,"MRST_CHARGE_TO_SOC",42011,"IV",0,1,"RW","u",r_value,w_value,0.01,con_value," ","charge to target SOC"],
+[67,"MRST_PWR_CHARGE",42020,"PW",2,0,"RW","u",r_value,w_value,1,con_value,"W","range:[0..2500W]"],
+[68,"MRST_PWR_DISCHARGE",42021,"PW",0,1,"RW","u",r_value,w_value,1,con_value,"W","range:[0..2500W]"],
+[69,"MRST_USER_MODE",43000,"UM",1,0,"RW","u",r_value,w_value,1,con_value," ","0:manual,1:anti-feed,2:trade-mode"],
+[70,"MRST_CHARGE_CUTOFF",44000,"CO",4,0,"RW","u",r_value,w_value,0.1,con_value,"%","range:[80%..100%]"],
+[71,"MRST_DISCHARGE_CUTOFF",44001,"CO",0,1,"RW","u",r_value,w_value,0.1,con_value,"%","range:[12%..30%]"],
+[72,"MRST_MAX_CHARGE_PWR",44002,"CO",0,2,"RW","u",r_value,w_value,1,con_value,"W","range:[0..2500W]"],
+[73,"MRST_MAX_DISCHARGE_PWR",44003,"CO",0,3,"RW","u",r_value,w_value,1,con_value,"W","range:[0..2500W]"]
 ]
 
 # --- Index for MARSTEK VENUS E fields ---- 
@@ -180,54 +207,56 @@ IDXM_BLCK = 4   # - Block size (how many regs)
 IDXM_OFFS = 5   # - Offset to start of block
 IDXM_MODE = 6   # - Read amd/or Write register
 IDXM_TYPE = 7   # - Variable type "char", "unsigned int", "signed int"
-IDXM_RAWV = 8   # - Value (raw modbus word)
-IDXM_GAIN = 9   # - Gain per unit
-IDXM_CONV = 10  # - Value (converted and adjusted for gain)
-IDXM_UNIT = 11  # - Unit
-IDXM_DESC = 12  # - Description
+IDXM_RVAL = 8   # - Read Value (raw modbus word)
+IDXM_WVAL = 9   # - Write Value (raw modbus word)
+IDXM_GAIN = 10  # - Gain per unit
+IDXM_CONV = 11  # - Converted Value (adjusted for gain)
+IDXM_UNIT = 12  # - Unit
+IDXM_DESC = 13  # - Description
+
 
 # -----------------------------------------------------------------------------------------
 # --- BATT thread -----------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------
-    
+
 def copy_marstek_to_batt(): 
     
     # --- Clear Device Name in BATT REG LIST : AC01..............
-    globl.BATT_REGISTER_LIST[globl.BATT_DEVICE_NAME][globl.IDXB_CONV] = "" # clear string
+    globl.BATT_REGISTERS[globl.BATT_DEVICE_NAME][globl.IDXB_GVAL] = "" # clear string
     # --- Copy the Device Name block 10x --> 20 characters (bytes)
     for idxm in range(MRST_DEVICE_NAME, MARSTEK_MODBUS[MRST_DEVICE_NAME][IDXM_BLCK] + MRST_DEVICE_NAME): # + 1
-        globl.BATT_REGISTER_LIST[globl.BATT_DEVICE_NAME][globl.IDXB_CONV] += MARSTEK_MODBUS[idxm][IDXM_CONV] # --- append str
+        globl.BATT_REGISTERS[globl.BATT_DEVICE_NAME][globl.IDXB_GVAL] += MARSTEK_MODBUS[idxm][IDXM_CONV] # --- append str
 
     #--- Copy MRST_FW_VERSION
-    globl.BATT_REGISTER_LIST[globl.BATT_FW_VERSION][globl.IDXB_CONV] = MARSTEK_MODBUS[MRST_FW_VERSION][IDXM_CONV]
+    globl.BATT_REGISTERS[globl.BATT_FW_VERSION][globl.IDXB_GVAL] = MARSTEK_MODBUS[MRST_FW_VERSION][IDXM_CONV]
 
     # --- Clear Serial Number in BATT REG LIST
-    globl.BATT_REGISTER_LIST[globl.BATT_SERIAL_NUM][globl.IDXB_CONV] = "" # clear string
+    globl.BATT_REGISTERS[globl.BATT_SERIAL_NUM][globl.IDXB_GVAL] = "" # clear string
     # --- Copy the Serial Number block 10x --> 20 characters (bytes)
     for idxm in range(MRST_SERIAL_NUM, MARSTEK_MODBUS[MRST_SERIAL_NUM][IDXM_BLCK] + MRST_SERIAL_NUM ): # + 1
-        globl.BATT_REGISTER_LIST[globl.BATT_SERIAL_NUM][globl.IDXB_CONV] += MARSTEK_MODBUS[idxm][IDXM_CONV] # --- append str
+        globl.BATT_REGISTERS[globl.BATT_SERIAL_NUM][globl.IDXB_GVAL] += MARSTEK_MODBUS[idxm][IDXM_CONV] # --- append str
 
     # Now copy all converterd value registers 1 on 1 until MRST_TOT_CHARGED (2 regs)
     for idxm in range(MRST_DC_VOLT, MRST_BACKUP_PWR_VAL + 1):
         #--- Copy regs incl offset BATT REG (3) vs MARST_MODBUS (22) (22-3=19)
         offset = MRST_DC_VOLT - globl.BATT_DC_VOLT 
-        globl.BATT_REGISTER_LIST[idxm-offset][globl.IDXB_CONV] = MARSTEK_MODBUS[idxm][IDXM_CONV]
+        globl.BATT_REGISTERS[idxm-offset][globl.IDXB_GVAL] = MARSTEK_MODBUS[idxm][IDXM_CONV]
    
     #--- Copy BATT_TOT_CHARGED -- Because these registers consist of 2 words...
-    #globl.BATT_REGISTER_LIST[globl.BATT_TOT_CHARGED][globl.IDXB_CONV] = (MARSTEK_MODBUS[MRST_TOT_CHARGED_H][IDXM_CONV] + MARSTEK_MODBUS[MRST_TOT_CHARGED_L][IDXM_CONV]) * MARSTEK_MODBUS[MRST_TOT_CHARGED_L][IDXM_GAIN]
-    #globl.BATT_REGISTER_LIST[globl.BATT_TOT_DISCHARGED][globl.IDXB_CONV] = (MARSTEK_MODBUS[MRST_TOT_DISCHARGED_H][IDXM_CONV] + MARSTEK_MODBUS[MRST_TOT_DISCHARGED_L][IDXM_CONV]) * MARSTEK_MODBUS[MRST_TOT_DISCHARGED_L][IDXM_GAIN]
-    #globl.BATT_REGISTER_LIST[globl.BATT_TOT_CHARGED][globl.IDXB_CONV] = "n.a."
-    #globl.BATT_REGISTER_LIST[globl.BATT_TOT_DISCHARGED][globl.IDXB_CONV] = "n.a."
-    #globl.BATT_REGISTER_LIST[globl.BATT_DAY_CHARGED][globl.IDXB_CONV] = "n.a."
-    #globl.BATT_REGISTER_LIST[globl.BATT_DAY_DISCHARGED][globl.IDXB_CONV] = "n.a."
-    #globl.BATT_REGISTER_LIST[globl.BATT_MNT_CHARGED][globl.IDXB_CONV] = "n.a."
-    #globl.BATT_REGISTER_LIST[globl.BATT_MNT_DISCHARGED][globl.IDXB_CONV] = "n.a."
+    #globl.BATT_REGISTERS[globl.BATT_TOT_CHARGED][globl.IDXB_GVAL] = (MARSTEK_MODBUS[MRST_TOT_CHARGED_H][IDXM_CONV] + MARSTEK_MODBUS[MRST_TOT_CHARGED_L][IDXM_CONV]) * MARSTEK_MODBUS[MRST_TOT_CHARGED_L][IDXM_GAIN]
+    #globl.BATT_REGISTERS[globl.BATT_TOT_DISCHARGED][globl.IDXB_GVAL] = (MARSTEK_MODBUS[MRST_TOT_DISCHARGED_H][IDXM_CONV] + MARSTEK_MODBUS[MRST_TOT_DISCHARGED_L][IDXM_CONV]) * MARSTEK_MODBUS[MRST_TOT_DISCHARGED_L][IDXM_GAIN]
+    #globl.BATT_REGISTERS[globl.BATT_TOT_CHARGED][globl.IDXB_GVAL] = "n.a."
+    #globl.BATT_REGISTERS[globl.BATT_TOT_DISCHARGED][globl.IDXB_GVAL] = "n.a."
+    #globl.BATT_REGISTERS[globl.BATT_DAY_CHARGED][globl.IDXB_GVAL] = "n.a."
+    #globl.BATT_REGISTERS[globl.BATT_DAY_DISCHARGED][globl.IDXB_GVAL] = "n.a."
+    #globl.BATT_REGISTERS[globl.BATT_MNT_CHARGED][globl.IDXB_GVAL] = "n.a."
+    #globl.BATT_REGISTERS[globl.BATT_MNT_DISCHARGED][globl.IDXB_GVAL] = "n.a."
     
     # Now copy all remaining registers until the end of the list
     for idxm in range(MRST_INT_TEMP, MRST_MAX_DISCHARGE_PWR + 1):
         #--- Copy regs incl offset BATT REG (24) vs MARST_MODBUS (49) (49-24=25)
         offset = MRST_INT_TEMP - globl.BATT_INT_TEMP
-        globl.BATT_REGISTER_LIST[idxm-offset][globl.IDXB_CONV] = MARSTEK_MODBUS[idxm][IDXM_CONV]
+        globl.BATT_REGISTERS[idxm-offset][globl.IDXB_GVAL] = MARSTEK_MODBUS[idxm][IDXM_CONV]
     
 # -----------------------------------------------------------------------------------------
 # --- Convert all modbus register values in the MARSTEK_MODBUS list object CON_VALUE ------
@@ -242,42 +271,42 @@ def convert_modbus_registers():
         # --- Copy to local reg for ease of use
         reg_name = MARSTEK_MODBUS[reg_index][IDXM_NAME]
         reg_type = MARSTEK_MODBUS[reg_index][IDXM_TYPE]
-        reg_rawv = MARSTEK_MODBUS[reg_index][IDXM_RAWV]
+        reg_rval = MARSTEK_MODBUS[reg_index][IDXM_RVAL]
         reg_gain = MARSTEK_MODBUS[reg_index][IDXM_GAIN]
         reg_unit = MARSTEK_MODBUS[reg_index][IDXM_UNIT]
         # --- In case of binary error/fault register show bits
         if reg_type == "b":
-            MARSTEK_MODBUS[reg_index][IDXM_CONV] = reg_rawv
+            MARSTEK_MODBUS[reg_index][IDXM_CONV] = reg_rval
         # --- In case of a char string register value
         elif reg_type == "c":
-            byte_high = (reg_rawv >> 8) & 0xFF
+            byte_high = (reg_rval >> 8) & 0xFF
             if byte_high < 33 or byte_high > 126: byte_high = 46 # --> "."
-            byte_low  = reg_rawv & 0xFF
+            byte_low  = reg_rval & 0xFF
             if byte_low < 33 or byte_low > 126: byte_low = 46 # --> "."
             MARSTEK_MODBUS[reg_index][IDXM_CONV] = chr(byte_high) + chr(byte_low)
         # --- In case of an un signed register value
         elif reg_type == "u":
-            MARSTEK_MODBUS[reg_index][IDXM_CONV] = reg_rawv * reg_gain
+            MARSTEK_MODBUS[reg_index][IDXM_CONV] = reg_rval * reg_gain
         # --- In case of a signed register value
         elif reg_type == "s":
-            if reg_rawv > 0x7FFF: reg_rawv -= 0x10000 # subtrackt to get negative value
-            MARSTEK_MODBUS[reg_index][IDXM_CONV] = reg_rawv * reg_gain
+            if reg_rval > 0x7FFF: reg_rval -= 0x10000 # subtrackt to get negative value
+            MARSTEK_MODBUS[reg_index][IDXM_CONV] = reg_rval * reg_gain
         else:
-            MARSTEK_MODBUS[reg_index][IDXM_CONV] = reg_rawv * reg_gain
+            MARSTEK_MODBUS[reg_index][IDXM_CONV] = reg_rval * reg_gain
     
 # -----------------------------------------------------------------------------------------
 
 def copy_modbus_register_block(result, register_block): # --- Copy the register block (#regs)
-    # --- Copy all modbus register values to MARSTEK_MODBUS list object RAW_VALUE
-    global MARSTEK_MODBUS
+    # --- Copy all modbus register values to MARSTEK_MODBUS list object READ_VALUE
+    #global MARSTEK_MODBUS
     for reg_index in range(0, len(result.registers)): # --- start with 0 
-        MARSTEK_MODBUS[register_block+reg_index][IDXM_RAWV] = result.registers[MARSTEK_MODBUS[register_block+reg_index][IDXM_OFFS]]
+        MARSTEK_MODBUS[register_block+reg_index][IDXM_RVAL] = result.registers[MARSTEK_MODBUS[register_block+reg_index][IDXM_OFFS]]
                 
 # -----------------------------------------------------------------------------------------
 
 def print_modbus_registers(): # --- Print all registers in MARSTEK_MODBUS
     
-    global MARSTEK_MODBUS
+    #global MARSTEK_MODBUS
     
     if globl.show_mrst:
         
@@ -292,25 +321,25 @@ def print_modbus_registers(): # --- Print all registers in MARSTEK_MODBUS
             reg_addr = MARSTEK_MODBUS[reg_index][IDXM_ADDR]
             reg_abbr = MARSTEK_MODBUS[reg_index][IDXM_ABBR]
             reg_type = MARSTEK_MODBUS[reg_index][IDXM_TYPE]
-            reg_rawv = MARSTEK_MODBUS[reg_index][IDXM_RAWV]
+            reg_rval = MARSTEK_MODBUS[reg_index][IDXM_RVAL]
             reg_conv = MARSTEK_MODBUS[reg_index][IDXM_CONV]
             reg_unit = MARSTEK_MODBUS[reg_index][IDXM_UNIT]
             reg_desc = MARSTEK_MODBUS[reg_index][IDXM_DESC]
 
             if reg_type == "b": 
-                print(f"[MRST] {reg_abbr} | {reg_name:<24} | {reg_addr:>5} |  0x{reg_addr:04X}  |  0x{reg_rawv:04X} | {reg_rawv:6}  | {reg_conv:>08b} | {reg_unit:<4} | {reg_desc}")
+                print(f"[MRST] {reg_abbr} | {reg_name:<24} | {reg_addr:>5} |  0x{reg_addr:04X}  |  0x{reg_rval:04X} | {reg_rval:6}  | {reg_conv:>08b} | {reg_unit:<4} | {reg_desc}")
             elif reg_type == "c": 
-                print(f"[MRST] {reg_abbr} | {reg_name:<24} | {reg_addr:>5} |  0x{reg_addr:04X}  |  0x{reg_rawv:04X} | {reg_rawv:6}  | {reg_conv:>8} | {reg_unit:<4} | {reg_desc}")
+                print(f"[MRST] {reg_abbr} | {reg_name:<24} | {reg_addr:>5} |  0x{reg_addr:04X}  |  0x{reg_rval:04X} | {reg_rval:6}  | {reg_conv:>8} | {reg_unit:<4} | {reg_desc}")
             elif reg_type == "s" and isinstance(reg_conv, int):  
-                print(f"[MRST] {reg_abbr} | {reg_name:<24} | {reg_addr:>5} |  0x{reg_addr:04X}  |  0x{reg_rawv:04X} | {reg_rawv:6}  | {reg_conv:>8} | {reg_unit:<4} | {reg_desc}")
+                print(f"[MRST] {reg_abbr} | {reg_name:<24} | {reg_addr:>5} |  0x{reg_addr:04X}  |  0x{reg_rval:04X} | {reg_rval:6}  | {reg_conv:>8} | {reg_unit:<4} | {reg_desc}")
             elif reg_type == "s" and isinstance(reg_conv, float):  
-                print(f"[MRST] {reg_abbr} | {reg_name:<24} | {reg_addr:>5} |  0x{reg_addr:04X}  |  0x{reg_rawv:04X} | {reg_rawv:6}  | {reg_conv:>8.2f} | {reg_unit:<4} | {reg_desc}")
+                print(f"[MRST] {reg_abbr} | {reg_name:<24} | {reg_addr:>5} |  0x{reg_addr:04X}  |  0x{reg_rval:04X} | {reg_rval:6}  | {reg_conv:>8.2f} | {reg_unit:<4} | {reg_desc}")
             elif reg_type == "u" and isinstance(reg_conv, int): 
-                print(f"[MRST] {reg_abbr} | {reg_name:<24} | {reg_addr:>5} |  0x{reg_addr:04X}  |  0x{reg_rawv:04X} | {reg_rawv:6}  | {reg_conv:>8} | {reg_unit:<4} | {reg_desc}")
+                print(f"[MRST] {reg_abbr} | {reg_name:<24} | {reg_addr:>5} |  0x{reg_addr:04X}  |  0x{reg_rval:04X} | {reg_rval:6}  | {reg_conv:>8} | {reg_unit:<4} | {reg_desc}")
             elif reg_type == "u" and isinstance(reg_conv, float): 
-                print(f"[MRST] {reg_abbr} | {reg_name:<24} | {reg_addr:>5} |  0x{reg_addr:04X}  |  0x{reg_rawv:04X} | {reg_rawv:6}  | {reg_conv:>8.2f} | {reg_unit:<4} | {reg_desc}")
+                print(f"[MRST] {reg_abbr} | {reg_name:<24} | {reg_addr:>5} |  0x{reg_addr:04X}  |  0x{reg_rval:04X} | {reg_rval:6}  | {reg_conv:>8.2f} | {reg_unit:<4} | {reg_desc}")
             else:   
-                print(f"[MRST] {reg_abbr} | {reg_name:<24} | {reg_addr:>5} |  0x{reg_addr:04X}  |  0x{reg_rawv:04X} | {reg_rawv:6}  | {reg_conv:>8} | {reg_unit:<4} | {reg_desc}")
+                print(f"[MRST] {reg_abbr} | {reg_name:<24} | {reg_addr:>5} |  0x{reg_addr:04X}  |  0x{reg_rval:04X} | {reg_rval:6}  | {reg_conv:>8} | {reg_unit:<4} | {reg_desc}")
                 
         print("[MRST] ---+--------------------------+-------+----------+---------+---------+----------+------+-----------")
 
@@ -339,8 +368,7 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
     # --- proportional controller
     new_setpoint = 0        # --- new setpoint
     mrst_delta = 0          # delta between mrst set and measured power    
-
-    
+   
 
     while not batt_stop_event.is_set():
         
@@ -449,7 +477,7 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
                 else: # copy modbus registers in MARSTEK_MODBUS list object
                     copy_modbus_register_block(result, reg_block)
 
-                # --- READ and WRITE registers -- SET values after setting RTU mode to 0x55AA = ON (0x55BB = OFF) 
+                # --- READ and WRITE registers -- You can only SET values after setting RTU mode to 0x55AA = ON (0x55BB = OFF) 
                 
                 # --- RESTART --- write 0x55AA
                 reg_block = MRST_RESTART
@@ -518,13 +546,15 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
                 # --- Convert all MODBUS registers and adjust gain
                 convert_modbus_registers()
 
-                # --- Copy MARSTEK MODBUS LIST to BATT_REGISTER_LIST with Thread.Lock
+                # --- Copy MARSTEK MODBUS LIST to BATT_REGISTERS with Thread.Lock
                 copy_marstek_to_batt()
 
-                # --- SET MODUS / PROGRAM ------------------------------------------------------------------                            
-                
+                # ------------------------------------------------------------------------------------------
+                # --- SET MODUS / PROGRAM ------------------------------------------------------------------
+                # ------------------------------------------------------------------------------------------
+
                 # --- MODE BASELOAD --------------------------------------
-                if globl.mode_baseload:
+                if globl.mode_bsld:
                     # --- Check if already in RTU mode    
                     if MARSTEK_MODBUS[MRST_RTU_MODE][IDXM_CONV] != 0x55AA: 
                         # --- Set value for MRST_RTU_MODE = 0x55AA (21930d)
@@ -558,22 +588,42 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
                     result = client.write_register(address=MARSTEK_MODBUS[MRST_PWR_DISCHARGE][IDXM_ADDR], value=int(new_setpoint), device_id=unit_id)
                     if result.isError():
                        globl.log_debug(module_name, f"Write error: {result}")
-                       
-                    # if globl.mode_changed:
-                        # # Reset the changed flag
-                        # globl.mode_changed = False
-                        # # --- ToDo: Check all the values
-                        # print(f"HOME_POWER[HOME_PWR_TIME_STAMP] = {globl.HOME_POWER[globl.HOME_PWR_TIME_STAMP][globl.IDXH_HVAL]}")
-                        # print(f"HOME_PWR_TOT = {globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL]}")
-                        # print(f"HOME_PWR_L1 = {globl.HOME_POWER[globl.HOME_PWR_L1][globl.IDXH_HVAL]}")
-                        # print(f"HOME_PWR_L2 = {globl.HOME_POWER[globl.HOME_PWR_L2][globl.IDXH_HVAL]}")
-                        # print(f"HOME_PWR_L3 = {globl.HOME_POWER[globl.HOME_PWR_L3][globl.IDXH_HVAL]}")
 
                 # --- MODE MANUAL --------------------------------------
-                if globl.mode_manual:
-                    if globl.mode_changed:
+                elif globl.mode_man:
+                    # --- Restart Marstek
+                    if globl.man_restart:
+                        print("[MRST] Restarting Marstek Venus E V2.0 ...")
+                        globl.man_restart = False
+                        result = client.write_register(address=MARSTEK_MODBUS[MRST_RESTART][IDXM_ADDR], value=0x55AA, device_id=unit_id)
+                        if result.isError():
+                            globl.log_debug(module_name, f"Write error: {result}")
+                        else:
+                            globl.log_debug(module_name, f"Write succes: {result}")
+                    elif globl.man_maxcpwr:
+                        print("[MRST] Marstek SET max charging power ...")
+                        globl.man_maxcpwr = False
+                        max_charging_power = globl.BATT_REGISTERS[globl.BATT_MAX_CHARGE_PWR][globl.IDXB_SVAL]
+                        result = client.write_register(address=MARSTEK_MODBUS[MRST_MAX_CHARGE_PWR][IDXM_ADDR], value=max_charging_power, device_id=unit_id)
+                        if result.isError():
+                            globl.log_debug(module_name, f"Write error: {result}")
+                        else:
+                            globl.log_debug(module_name, f"Write succes: {result}")
+                    elif globl.man_maxdpwr:
+                        print("[MRST] Marstek SET max discharging power ...")
+                        globl.man_maxdpwr = False
+                        max_discharging_power = globl.BATT_REGISTERS[globl.BATT_MAX_DISCHARGE_PWR][globl.IDXB_SVAL]
+                        result = client.write_register(address=MARSTEK_MODBUS[MRST_MAX_DISCHARGE_PWR][IDXM_ADDR], value=max_discharging_power, device_id=unit_id)
+                        if result.isError():
+                            globl.log_debug(module_name, f"Write error: {result}")
+                        else:
+                            globl.log_debug(module_name, f"Write succes: {result}")
+                            
+                            
+                            
+                    if False:
                         # Reset the changed flag
-                        globl.mode_changed = False
+                        #globl.mode_changed = False
                         # --- Check if already in RTU mode
                         if MARSTEK_MODBUS[MRST_RTU_MODE][IDXM_CONV] != 0x55AA:
                             # --- Set value for MRST_RTU_MODE = 0x55AA (21930d)
@@ -584,6 +634,7 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
                         result = client.write_register(address=MARSTEK_MODBUS[MRST_PWR_CHARGE][IDXM_ADDR], value=globl.set_pwr_charge, device_id=unit_id)
                         if result.isError():
                             globl.log_debug(module_name, f"Write error: {result}")
+                            
                         # --- Set value for MRST_PWR_DISCHARGE
                         result = client.write_register(address=MARSTEK_MODBUS[MRST_PWR_DISCHARGE][IDXM_ADDR], value=globl.set_pwr_discharge, device_id=unit_id)
                         if result.isError():
@@ -592,9 +643,46 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
                         result = client.write_register(address=MARSTEK_MODBUS[MRST_SET_INV_STATE][IDXM_ADDR], value=globl.set_inv_state, device_id=unit_id)
                         if result.isError():
                             globl.log_debug(module_name, f"Write error: {result}")
+
+                # --- MODE Nul Op de Meter --------------------------------------
+                elif globl.mode_nom :
+                    # --- Check if already in RTU mode    
+                    if MARSTEK_MODBUS[MRST_RTU_MODE][IDXM_CONV] != 0x55AA: 
+                        # --- Set value for MRST_RTU_MODE = 0x55AA (21930d)
+                        result = client.write_register(address=MARSTEK_MODBUS[MRST_RTU_MODE][IDXM_ADDR], value=0x55AA, device_id=unit_id)
+                        if result.isError():
+                            globl.log_debug(module_name, f"Write error: {result}")
+                     # --- Check if already in discharge mode : MRST_SET_INV_STATE is NOT set to discharge then...
+                    inverter_state = 2  # --- discharge
+                    if MARSTEK_MODBUS[MRST_SET_INV_STATE][IDXM_ADDR] != inverter_state: # --- Check if already in RTU mode
+                        # --- Set MRST_SET_INV_STATE to discharge
+                        result = client.write_register(address=MARSTEK_MODBUS[MRST_SET_INV_STATE][IDXM_ADDR], value=inverter_state, device_id=unit_id)
+                        if result.isError():
+                            globl.log_debug(module_name, f"Write error: {result}")
+
+                    # ToDo: Implement BATT controller that follows the DSMR
+                    home_power = globl.HOME_POWER[globl.HOME_PWR_TOT][globl.IDXH_HVAL]  # --- POS means power consumption (NEG = production)
+                    mrst_measured_power = MARSTEK_MODBUS[MRST_AC_PWR_VAL][IDXM_CONV]  # --- POS is discharging (NEG = charging)
+                    mrst_setpoint_discharge_power = MARSTEK_MODBUS[MRST_PWR_DISCHARGE][IDXM_CONV]  # --- Setpoint discharge power
                     
-                # --- Stop the running programm -------------------------------
-                if globl.mode_stop:
+                    # --- Calculate the delta using proporional value only
+                    mrst_delta = mrst_setpoint_discharge_power - mrst_measured_power # -- POS means ramping up and NEG means ramping down
+                    print(f"HOME POWER:{home_power}; mrst_delta:{mrst_delta}; mrst_setpoint:{mrst_setpoint_discharge_power}; mrst_measured:{mrst_measured_power}")
+                    new_setpoint = mrst_setpoint_discharge_power + (home_power - mrst_delta)
+                    
+                    #if home_power > 0:  # --- Home is consuming energy
+                    #    new_setpoint = mrst_setpoint_discharge_power + (home_power - mrst_delta)
+                    #elif home_power < 0:  # --- Home is producing energy
+                    #    new_setpoint = mrst_setpoint_discharge_power + (home_power - mrst_delta)
+                    
+                    # --- Set value for MRST_PWR_DISCHARGE
+                    result = client.write_register(address=MARSTEK_MODBUS[MRST_PWR_DISCHARGE][IDXM_ADDR], value=int(new_setpoint), device_id=unit_id)
+                    if result.isError():
+                       globl.log_debug(module_name, f"Write error: {result}")
+
+
+                # --- Stop any running programm -------------------------------
+                elif globl.mode_stop:
                     # Reset the stop flag
                     globl.mode_stop = False
                     print("[BATT] Stopping running program ...")
@@ -610,15 +698,7 @@ def batt_thread_fn(batt_stop_event: threading.Event, interval: float = 2.0):
                         globl.log_debug(module_name, f"Write error: {result}")
                     print("[BATT] Stopped running program ...")
 
-                # --- Restart marstek
-                if globl.batt_restart:
-                    print("[BATT] Restarting Marstek Venus E V2.0 ...")
-                    globl.batt_restart = False
-                    result = client.write_register(address=MARSTEK_MODBUS[MRST_RESTART][IDXM_ADDR], value=0x55AA, device_id=unit_id)
-                    if result.isError():
-                        globl.log_debug(module_name, f"Write error: {result}")
-                    else:
-                        globl.log_debug(module_name, f"Write succes: {result}")
+
 
                 # --- Print all MODBUS registers
                 print_modbus_registers()
